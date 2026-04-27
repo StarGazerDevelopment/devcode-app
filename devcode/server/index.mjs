@@ -11,6 +11,7 @@ import { getRun, killRun, startRun } from './lib/terminal.mjs'
 import { searchText } from './lib/search.mjs'
 import os from 'node:os'
 import fs from 'node:fs'
+import { getGlobalSettings, saveGlobalSettings, getGlobalEnv, saveGlobalEnv, getProjects, addProject } from './lib/global.mjs'
 
 const PORT = Number(process.env.DEVCODE_PORT || 3030)
 const VITE_ORIGIN = process.env.DEVCODE_WEB_ORIGIN || 'http://localhost:5173'
@@ -45,6 +46,47 @@ app.post('/api/update/remind', (req, res) => {
     fs.writeFileSync(remindFile, JSON.stringify({ date, skippedVersion }))
     res.json({ ok: true })
   } catch(e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.get('/api/settings', (req, res) => {
+  try {
+    const settings = getGlobalSettings()
+    const env = getGlobalEnv()
+    res.json({ ok: true, settings, env })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.post('/api/settings', (req, res) => {
+  try {
+    const { settings, env } = req.body
+    if (settings) saveGlobalSettings(settings)
+    if (env) saveGlobalEnv(env)
+    res.json({ ok: true })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.get('/api/projects', (req, res) => {
+  try {
+    const projects = getProjects()
+    res.json({ ok: true, projects })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.post('/api/projects', (req, res) => {
+  try {
+    const { projectRoot } = req.body
+    if (!projectRoot) return res.status(400).json({ ok: false, error: 'Missing projectRoot' })
+    const projects = addProject(projectRoot)
+    res.json({ ok: true, projects })
+  } catch (e) {
     res.json({ ok: false, error: e.message })
   }
 })

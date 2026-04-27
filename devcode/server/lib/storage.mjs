@@ -1,8 +1,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { getProjectHash, GLOBAL_DIR } from './global.mjs'
 
 export function projectDataDir(projectRoot) {
-  return path.join(projectRoot, '.devcode')
+  const hash = getProjectHash(projectRoot)
+  const baseName = path.basename(projectRoot)
+  return path.join(GLOBAL_DIR, 'chats', `${baseName}_${hash}`)
 }
 
 async function readJsonSafe(filePath, fallback) {

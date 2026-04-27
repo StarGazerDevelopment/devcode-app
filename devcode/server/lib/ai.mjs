@@ -1,8 +1,10 @@
 import Groq from 'groq-sdk'
+import { getGlobalEnv } from './global.mjs'
 
 function requireEnv(name) {
-  const v = process.env[name]
-  if (!v) throw new Error(`Missing ${name}`)
+  const globalEnv = getGlobalEnv()
+  const v = globalEnv[name] || process.env[name]
+  if (!v) throw new Error(`Missing ${name} in API settings`)
   return v
 }
 
@@ -12,7 +14,8 @@ export function createGroqClient() {
 }
 
 export function defaultModel() {
-  return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+  const globalEnv = getGlobalEnv()
+  return globalEnv.GROQ_MODEL || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
 }
 
 export async function runAgent({ groq, model, messages, tools, toolHandlers, onToken, maxSteps = 6 }) {

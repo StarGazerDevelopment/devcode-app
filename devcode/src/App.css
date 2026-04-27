@@ -1,6 +1,116 @@
-.app {
-  height: 100vh;
+.layout {
+  display: flex;
   width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.global-sidebar {
+  width: 64px;
+  min-width: 64px;
+  background-color: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  z-index: 100;
+}
+
+.global-projects {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.global-projects::-webkit-scrollbar {
+  display: none;
+}
+
+.project-bubble {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 20px;
+  color: #111;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.project-bubble:hover {
+  transform: scale(1.05);
+}
+
+.project-bubble.selected {
+  box-shadow: 0 0 0 2px var(--bg-tertiary), 0 0 0 4px var(--fg-primary);
+}
+
+.project-bubble.add-project {
+  background: transparent !important;
+  color: var(--fg-primary);
+  border: 1px dashed var(--border-color);
+  font-size: 24px;
+  font-weight: 300;
+}
+
+.global-settings-btn {
+  margin-top: auto;
+  cursor: pointer;
+  color: var(--fg-secondary);
+  padding: 10px;
+  border-radius: 12px;
+  transition: color 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-settings-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+}
+
+.theme-card {
+  transition: all 0.2s;
+}
+
+.theme-card.active {
+  transform: scale(1.05);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.api-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+  font-family: var(--mono);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.api-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.app {
+  flex: 1;
+  height: 100vh;
+  width: auto;
   display: flex;
   flex-direction: column;
   background: var(--bg);

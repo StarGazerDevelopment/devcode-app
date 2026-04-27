@@ -54,6 +54,13 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string, forced: boolean, url: string, releaseNotes: string } | null>(null)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
 
+  // Global settings & Onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(0)
+  const [globalProjects, setGlobalProjects] = useState<string[]>([])
+  const [showSettings, setShowSettings] = useState(false)
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+
   const chatLogRef = useRef<HTMLDivElement | null>(null)
   
   // Terminal refs
@@ -194,6 +201,22 @@ function App() {
   }
 
   async function initProject() {
+    const s = await apiGet<{ settings: { onboarded: boolean, theme: string }, env: Record<string, string> }>('/api/settings')
+    if (s.ok) {
+      if (!s.settings.onboarded) {
+        setShowOnboarding(true)
+      }
+      if (s.settings.theme) {
+        setTheme(s.settings.theme as 'light'|'dark')
+      }
+      setApiKeys(s.env || {})
+    }
+
+    const pr = await apiGet<{ projects: string[] }>('/api/projects')
+    if (pr.ok) {
+      setGlobalProjects(pr.projects)
+    }
+
     const state = (await window.devcode?.getState?.()) ?? {}
     const last = typeof state.lastProjectPath === 'string' ? state.lastProjectPath : null
     if (!last) return
@@ -202,6 +225,12 @@ function App() {
       const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: last })
       if (r.ok) {
         setProjectRoot(r.projectRoot)
+        await apiPost('/api/projects', { projectRoot: r.projectRoot }) // Add to global if not exists
+        
+        // Refresh global projects list
+        const pr2 = await apiGet<{ projects: string[] }>('/api/projects')
+        if (pr2.ok) setGlobalProjects(pr2.projects)
+
         await refreshTree()
         await loadChat('default')
         return
@@ -449,8 +478,85 @@ function App() {
     setShowUpdateModal(false)
   }
 
+  async function completeOnboarding() {
+    await apiPost('/api/settings', { settings: { onboarded: true, theme }, env: apiKeys })
+    setShowOnboarding(false)
+  }
+
+  async function openGlobalProject(p: string) {
+    if (window.devcode?.setState) {
+      await window.devcode.setState({ lastProjectPath: p })
+    }
+    const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: p })
+    if (r.ok) {
+      setProjectRoot(r.projectRoot)
+      await refreshTree()
+      await loadChat('default')
+    }
+  }
+
+  async function pickNewProject() {
+    if (window.devcode?.selectFolder) {
+      const p = await window.devcode.selectFolder()
+      if (p) {
+        await apiPost('/api/projects', { projectRoot: p })
+        const pr = await apiGet<{ projects: string[] }>('/api/projects')
+        if (pr.ok) setGlobalProjects(pr.projects)
+        await openGlobalProject(p)
+      }
+    }
+  }
+
+  const providers = [
+    { id: 'GROQ_API_KEY', name: 'Groq' },
+    { id: 'OPENAI_API_KEY', name: 'OpenAI' },
+    { id: 'ANTHROPIC_API_KEY', name: 'Anthropic' },
+    { id: 'OPENROUTER_API_KEY', name: 'OpenRouter' },
+    { id: 'GEMINI_API_KEY', name: 'Google Gemini' },
+    { id: 'MISTRAL_API_KEY', name: 'Mistral' },
+    { id: 'TOGETHER_API_KEY', name: 'Together AI' },
+    { id: 'DEEPSEEK_API_KEY', name: 'DeepSeek' },
+    { id: 'AZURE_OPENAI_API_KEY', name: 'Azure OpenAI' },
+    { id: 'COHERE_API_KEY', name: 'Cohere' },
+    { id: 'PERPLEXITY_API_KEY', name: 'Perplexity' },
+    { id: 'CUSTOM_ENDPOINT_KEY', name: 'Custom Endpoint' },
+  ]
+
   return (
-    <div className="app">
+    <div className="layout">
+      {/* GLOBAL SIDEBAR */}
+      <div className="global-sidebar">
+        <div className="global-projects">
+          {globalProjects.map((p, i) => {
+            const isSelected = p === projectRoot
+            const firstLetter = p.split(/[\/\\]/).pop()?.[0]?.toUpperCase() || '?'
+            // Generate a deterministic soft color based on the path string
+            const hue = p.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360
+            const softColor = `hsl(${hue}, 70%, 80%)`
+
+            return (
+              <div
+                key={i}
+                className={`project-bubble ${isSelected ? 'selected' : ''}`}
+                style={{ backgroundColor: softColor }}
+                title={p}
+                onClick={() => openGlobalProject(p)}
+              >
+                {firstLetter}
+              </div>
+            )
+          })}
+          <div className="project-bubble add-project" onClick={pickNewProject} title="Add Project">
+            +
+          </div>
+        </div>
+        <div className="global-settings-btn" onClick={() => setShowSettings(true)} title="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </div>
+      </div>
+
+      {/* MAIN APP CONTAINER */}
+      <div className="app">
       {/* UPDATE MODAL */}
       {showUpdateModal && updateAvailable && (
         <div className="update-modal-overlay">
@@ -473,8 +579,135 @@ function App() {
         </div>
       )}
 
-      <div className="workspace">
-        {/* Activity Bar */}
+      {/* ONBOARDING MODAL */}
+      {showOnboarding && (
+        <div className="update-modal-overlay" style={{ backdropFilter: 'blur(10px)', background: 'var(--bg-primary)' }}>
+          <div className="update-modal" style={{ textAlign: 'center', maxWidth: 600 }}>
+            {onboardingStep === 0 && (
+              <>
+                <h1 style={{ fontSize: '2rem', marginBottom: '1rem', background: 'linear-gradient(to right, #3b82f6, #8b5cf6)', WebkitBackgroundClip: 'text', color: 'transparent' }}>Welcome to DevCode!</h1>
+                <p style={{ color: 'var(--fg-secondary)', marginBottom: '2rem', fontSize: '1.1rem' }}>Your ultimate AI-powered coding platform.</p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--accent-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                </div>
+                <button className="primaryBtn" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }} onClick={() => setOnboardingStep(1)}>
+                  Next <ChevronRight size={18} style={{ marginLeft: 8 }} />
+                </button>
+              </>
+            )}
+            {onboardingStep === 1 && (
+              <>
+                <h2 style={{ marginBottom: '2rem' }}>Select a Theme</h2>
+                <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', marginBottom: '2rem' }}>
+                  <div 
+                    className={`theme-card ${theme === 'light' ? 'active' : ''}`}
+                    onClick={() => setTheme('light')}
+                    style={{ padding: '2rem', border: '2px solid', borderColor: theme === 'light' ? 'var(--accent-color)' : 'var(--border-color)', borderRadius: 12, cursor: 'pointer', background: '#f8fafc', color: '#0f172a' }}
+                  >
+                    <Sun size={48} style={{ marginBottom: '1rem' }} />
+                    <h3>Light</h3>
+                  </div>
+                  <div 
+                    className={`theme-card ${theme === 'dark' ? 'active' : ''}`}
+                    onClick={() => setTheme('dark')}
+                    style={{ padding: '2rem', border: '2px solid', borderColor: theme === 'dark' ? 'var(--accent-color)' : 'var(--border-color)', borderRadius: 12, cursor: 'pointer', background: '#0f172a', color: '#f8fafc' }}
+                  >
+                    <Moon size={48} style={{ marginBottom: '1rem' }} />
+                    <h3>Dark</h3>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--accent-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                </div>
+                <button className="primaryBtn" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }} onClick={() => setOnboardingStep(2)}>
+                  Next <ChevronRight size={18} style={{ marginLeft: 8 }} />
+                </button>
+              </>
+            )}
+            {onboardingStep === 2 && (
+              <>
+                <h2 style={{ marginBottom: '0.5rem' }}>Host your own AIs: Keep DevCode Free</h2>
+                <p style={{ color: 'var(--fg-secondary)', marginBottom: '1.5rem' }}>Enter an API key from your preferred provider to get started.</p>
+                
+                <div style={{ textAlign: 'left', maxHeight: '40vh', overflowY: 'auto', paddingRight: '1rem', marginBottom: '2rem' }}>
+                  {providers.map(p => (
+                    <div key={p.id} style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>{p.name} API Key</label>
+                      <input 
+                        type="password" 
+                        placeholder={`Enter ${p.name} API Key...`} 
+                        value={apiKeys[p.id] || ''}
+                        onChange={(e) => setApiKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        className="api-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--border-color)' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--accent-color)' }} />
+                </div>
+                <button className="primaryBtn" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }} onClick={completeOnboarding}>
+                  Get Started <ChevronRight size={18} style={{ marginLeft: 8 }} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SETTINGS MODAL */}
+      {showSettings && (
+        <div className="update-modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="update-modal" style={{ maxWidth: 600, width: '100%', height: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0 }}>Settings</h2>
+              <button className="iconBtn" onClick={() => setShowSettings(false)}><X size={20} /></button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem' }}>
+              <h3 style={{ marginBottom: '1rem', color: 'var(--fg-secondary)' }}>Theme</h3>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                <button className={`btn ${theme === 'light' ? 'primary' : 'outline'}`} onClick={() => setTheme('light')}>Light</button>
+                <button className={`btn ${theme === 'dark' ? 'primary' : 'outline'}`} onClick={() => setTheme('dark')}>Dark</button>
+              </div>
+
+              <h3 style={{ marginBottom: '1rem', color: 'var(--fg-secondary)' }}>API Providers</h3>
+              <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '1rem' }}>Keys are stored locally in your ~/.devcode folder.</p>
+              
+              {providers.map(p => (
+                <div key={p.id} style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>{p.name} API Key</label>
+                  <input 
+                    type="password" 
+                    placeholder={`Enter ${p.name} API Key...`} 
+                    value={apiKeys[p.id] || ''}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
+                    className="api-input"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <button className="primaryBtn" onClick={() => {
+                apiPost('/api/settings', { settings: { theme, onboarded: true }, env: apiKeys })
+                setShowSettings(false)
+              }}>
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
         <div className="activityBar">
         <div 
           className={showExplorer ? 'activityIcon active' : 'activityIcon'} 
