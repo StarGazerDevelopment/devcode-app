@@ -43,6 +43,11 @@ app.get('/api/active-users', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Website backend running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Website backend running on http://localhost:${PORT}`);
+    });
+}
+
+// Export for Vercel serverless function
+module.exports = app;
