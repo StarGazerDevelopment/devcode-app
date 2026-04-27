@@ -251,8 +251,9 @@ function App() {
 
   async function checkUpdate() {
     try {
-      const CURRENT_VERSION = '1.0.0'
-      const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config')
+      const CURRENT_VERSION = '1.0.2'
+      // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
+      const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
       if (!res.ok) return
       const config = await res.json()
 
