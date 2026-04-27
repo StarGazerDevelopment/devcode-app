@@ -43,7 +43,7 @@ app.post('/api/ping', async (req, res) => {
 // API Endpoint to get active users count
 app.get('/api/active-users', async (req, res) => {
     try {
-        let count = 142; // Base fallback mock value
+        let count = 0; // True base value
 
         // Try to fetch from Supabase if env vars are properly configured
         if (process.env.SUPABASE_URL && process.env.SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
@@ -55,8 +55,9 @@ app.get('/api/active-users', async (req, res) => {
                 .gte('last_seen', twoMinsAgo);
             
             if (!error && activeCount !== null) {
-                // If the real count is low during testing, add a base number for marketing
-                count = Math.max(activeCount, 142);
+                count = activeCount;
+            } else if (error) {
+                console.error("Supabase Error:", error.message);
             }
         } else {
             // Clean up old memory sessions
@@ -64,17 +65,14 @@ app.get('/api/active-users', async (req, res) => {
             for (const [id, lastSeen] of activeSessions.entries()) {
                 if (now - lastSeen > 2 * 60 * 1000) activeSessions.delete(id);
             }
-            // Use real count if it exceeds mock base, else add real count to mock base
-            count = 142 + activeSessions.size;
+            // Use real memory count
+            count = activeSessions.size;
         }
         
-        // Add some jitter for demo purposes to simulate live users
-        const jitter = Math.floor(Math.random() * 3) - 1; // -1 to +1
-        
-        res.json({ active_users: Math.max(0, count + jitter) });
+        res.json({ active_users: Math.max(0, count) });
     } catch (err) {
         console.error('Error fetching active users:', err);
-        res.json({ active_users: 142 });
+        res.json({ active_users: 0 });
     }
 });
 
