@@ -14,6 +14,12 @@ import 'xterm/css/xterm.css'
 
 import logo from './assets/logo.png'
 
+// Ensure we have a persistent device ID for active user counting
+const DEVICE_ID = localStorage.getItem('devcode_device_id') || crypto.randomUUID();
+if (!localStorage.getItem('devcode_device_id')) {
+  localStorage.setItem('devcode_device_id', DEVICE_ID);
+}
+
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const stored = localStorage.getItem('devcode-theme')
@@ -65,6 +71,28 @@ function App() {
       }
     }
   }, [theme])
+
+  // Live active users heartbeat
+  useEffect(() => {
+    const pingActiveUsers = async () => {
+      try {
+        await fetch('https://devcode-ai-webservice.vercel.app/api/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: DEVICE_ID })
+        })
+      } catch (err) {
+        // Silently fail if unable to reach server
+      }
+    }
+
+    // Ping immediately on load
+    pingActiveUsers()
+    
+    // Ping every 30 seconds to keep session alive
+    const interval = setInterval(pingActiveUsers, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     if (chatLogRef.current) {

@@ -508,8 +508,8 @@
         // Fetch on load and set polling interval
         document.addEventListener('DOMContentLoaded', () => {
             fetchActiveUsers();
-            // Poll every 10 seconds to update the count
-            setInterval(fetchActiveUsers, 10000);
+            // Poll every 3 seconds to update the count for a live feel
+            setInterval(fetchActiveUsers, 3000);
         });
     </script>
 </body>
