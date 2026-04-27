@@ -1,0 +1,27 @@
+directories:
+  output: ../Installer
+  buildResources: build
+appId: com.stargazer.devcode
+productName: DevCode
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+      - server/**/*
+      - package.json
+win:
+  target: nsis
+  icon: src/assets/logo.png
+npmRebuild: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DevCode
+  artifactName: installer.exe
+asarUnpack:
+  - server/**/*
+  - node_modules/node-pty/**/*
+electronVersion: 41.3.0

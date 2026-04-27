@@ -1,8 +1,11 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { spawn } = require('child_process')
 
 const isDev = !app.isPackaged
+
+let serverProcess = null
 
 function getStatePath() {
   return path.join(app.getPath('userData'), 'state.json')
@@ -70,11 +73,23 @@ app.whenReady().then(async () => {
 
   await createWindow()
 
+  if (!isDev) {
+    const serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server', 'index.mjs')
+    const nodePath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server', 'node.exe')
+    serverProcess = spawn(nodePath, [serverPath], {
+      env: { ...process.env, NODE_ENV: 'production' },
+      stdio: 'inherit'
+    })
+  }
+
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
+  if (serverProcess) {
+    serverProcess.kill()
+  }
   if (process.platform !== 'darwin') app.quit()
 })

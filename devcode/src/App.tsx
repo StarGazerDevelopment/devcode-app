@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Editor } from '@monaco-editor/react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Code, FileText, Folder, Moon, Play, RefreshCcw, Save, Sun, MessageSquare, TerminalSquare, X, ChevronRight, FileJson, FileCode, Image as ImageIcon, FileType } from 'lucide-react'
-import { apiGet, apiPost } from './lib/api'
+import { Code, FileText, Folder, Moon, Play, RefreshCcw, Save, Sun, MessageSquare, TerminalSquare, X, ChevronRight, FileJson, FileCode, Image as ImageIcon, FileType, Download } from 'lucide-react'
+import { apiGet, apiPost, sse } from './lib/api'
 import type { Chat, ChatMessage, FsTree } from './lib/types'
 
 // xterm imports
@@ -49,6 +49,10 @@ function App() {
   const [chat, setChat] = useState<Chat>({ id: 'default', messages: [] })
   const [chatDraft, setChatDraft] = useState('')
   const [chatBusy, setChatBusy] = useState(false)
+
+  // Update System
+  const [updateAvailable, setUpdateAvailable] = useState<{ version: string, forced: boolean, url: string, releaseNotes: string } | null>(null)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
 
   const chatLogRef = useRef<HTMLDivElement | null>(null)
   
@@ -127,7 +131,7 @@ function App() {
     fitAddonRef.current = fitAddon
 
     const wsUrl = `ws://localhost:3030/api/terminal/pty?cwd=${encodeURIComponent(projectRoot)}`
-    const ws = new WebSocket(wsUrl)
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -193,22 +197,87 @@ function App() {
     const state = (await window.devcode?.getState?.()) ?? {}
     const last = typeof state.lastProjectPath === 'string' ? state.lastProjectPath : null
     if (!last) return
-    const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: last })
-    if (!r.ok) return
-    setProjectRoot(r.projectRoot)
-    await refreshTree()
-    await loadChat('default')
+    
+    for (let i = 0; i < 10; i++) {
+      const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: last })
+      if (r.ok) {
+        setProjectRoot(r.projectRoot)
+        await refreshTree()
+        await loadChat('default')
+        return
+      }
+      await new Promise(res => setTimeout(res, 500))
+    }
+  }
+
+  function compareSemver(a: string, b: string) {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    }
+    return 0;
+  }
+
+  async function checkUpdate() {
+    try {
+      const CURRENT_VERSION = '1.0.0'
+      const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config')
+      if (!res.ok) return
+      const config = await res.json()
+
+      const isNewer = compareSemver(config.version, CURRENT_VERSION) > 0
+      if (!isNewer) return
+
+      // It's a new version. Check remind settings.
+      const remRes = await apiGet<{ data: { date: number, skippedVersion: string } | null }>('/api/update/remind')
+      let shouldShow = true
+
+      if (remRes.ok && remRes.data) {
+        const { date, skippedVersion } = remRes.data
+        const now = Date.now()
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+
+        // If it's a forced update, ignore reminder
+        if (config.forced) {
+          shouldShow = true
+        } else {
+          // If the config version is greater than the skipped version (meaning 2 updates have passed)
+          if (compareSemver(config.version, skippedVersion) > 0) {
+            shouldShow = true
+          } else if (now - date < threeDaysMs) {
+            // Within 3 days of reminder for the same version
+            shouldShow = false
+          }
+        }
+      }
+
+      if (shouldShow) {
+        setUpdateAvailable({
+          version: config.version,
+          forced: config.forced,
+          url: config.downloadUrl,
+          releaseNotes: config.releaseNotes || 'Bug fixes and performance improvements.'
+        })
+        setShowUpdateModal(true)
+      }
+
+    } catch (err) {
+      console.error('Update check failed:', err)
+    }
   }
 
   useEffect(() => {
     void initProject()
+    void checkUpdate()
   }, [])
 
   useEffect(() => {
     if (!projectRoot) return
     let timeout: ReturnType<typeof setTimeout>
     
-    const es = new EventSource('/api/fs/watch')
+    const es = sse('/api/fs/watch')
     es.addEventListener('change', () => {
       // Debounce the refresh
       clearTimeout(timeout)
@@ -287,7 +356,7 @@ function App() {
     }
 
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch('http://localhost:3030/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -374,8 +443,36 @@ function App() {
     return rows
   }, [tree, expanded])
 
+  function handleRemindMe() {
+    if (!updateAvailable) return
+    apiPost('/api/update/remind', { date: Date.now(), skippedVersion: updateAvailable.version })
+    setShowUpdateModal(false)
+  }
+
   return (
     <div className="app">
+      {/* UPDATE MODAL */}
+      {showUpdateModal && updateAvailable && (
+        <div className="update-modal-overlay">
+          <div className="update-modal">
+            <h2>Update Available ({updateAvailable.version})</h2>
+            <div className="update-notes">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{updateAvailable.releaseNotes}</ReactMarkdown>
+            </div>
+            <div className="update-actions">
+              {!updateAvailable.forced && (
+                <button className="btn outline" onClick={handleRemindMe}>
+                  Remind me in 3 days
+                </button>
+              )}
+              <a href={updateAvailable.url} target="_blank" rel="noreferrer" className="btn primary" onClick={() => !updateAvailable.forced && setShowUpdateModal(false)}>
+                <Download size={16} /> Download Update
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="workspace">
         {/* Activity Bar */}
         <div className="activityBar">

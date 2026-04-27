@@ -9,13 +9,45 @@ import { createGroqClient, defaultModel, runAgent } from './lib/ai.mjs'
 import { ensureProjectData, listChats, readChat, writeChat } from './lib/storage.mjs'
 import { getRun, killRun, startRun } from './lib/terminal.mjs'
 import { searchText } from './lib/search.mjs'
+import os from 'node:os'
+import fs from 'node:fs'
 
 const PORT = Number(process.env.DEVCODE_PORT || 3030)
 const VITE_ORIGIN = process.env.DEVCODE_WEB_ORIGIN || 'http://localhost:5173'
 
 const app = express()
-app.use(cors({ origin: VITE_ORIGIN, credentials: false }))
+app.use(cors({ origin: '*', credentials: false }))
 app.use(express.json({ limit: '10mb' }))
+
+const DEVCODE_DIR = path.join(os.homedir(), '.devcode')
+if (!fs.existsSync(DEVCODE_DIR)) {
+  fs.mkdirSync(DEVCODE_DIR, { recursive: true })
+}
+
+app.get('/api/update/remind', (req, res) => {
+  try {
+    const remindFile = path.join(DEVCODE_DIR, 'update_remind.json')
+    if (fs.existsSync(remindFile)) {
+      const data = JSON.parse(fs.readFileSync(remindFile, 'utf8'))
+      res.json({ ok: true, data })
+    } else {
+      res.json({ ok: true, data: null })
+    }
+  } catch(e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.post('/api/update/remind', (req, res) => {
+  try {
+    const { date, skippedVersion } = req.body
+    const remindFile = path.join(DEVCODE_DIR, 'update_remind.json')
+    fs.writeFileSync(remindFile, JSON.stringify({ date, skippedVersion }))
+    res.json({ ok: true })
+  } catch(e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
 
 let currentProjectRoot = null
 
