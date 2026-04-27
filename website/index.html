@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevCode - AI Coding Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d4aa;
+            --primary-dark: #00a883;
+            --secondary: #1e90ff;
+            --dark: #0a0e14;
+            --dark-secondary: #131920;
+            --dark-tertiary: #1a2028;
+            --text: #e6edf3;
+            --text-muted: #7a8a9a;
+            --border: #252f3a;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-effects {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0, 212, 170, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 170, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        .bg-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.2;
+        }
+
+        .bg-glow-1 { top: -20%; left: -10%; background: var(--primary); }
+        .bg-glow-2 { bottom: -20%; right: -10%; background: var(--secondary); }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: rgba(10, 14, 20, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo-img {
+            width: 40px;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .logo-text {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--text); }
+
+        .hero {
+            text-align: center;
+            padding: 4rem 2rem 2rem;
+            animation: heroSlide 0.8s ease-out;
+        }
+
+        @keyframes heroSlide {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: titleGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { filter: drop-shadow(0 0 20px rgba(0, 212, 170, 0.3)); }
+            50% { filter: drop-shadow(0 0 40px rgba(0, 212, 170, 0.6)); }
+        }
+
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .active-users {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            border-radius: 20px;
+            color: var(--primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 15px rgba(0, 212, 170, 0.05);
+            animation: fadeIn 0.5s ease-out forwards;
+            animation-delay: 0.3s;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.7);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 212, 170, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 212, 170, 0); }
+        }
+
+        .user-count {
+            display: inline-block;
+            min-width: 3ch;
+            text-align: center;
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 4rem;
+            padding: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-item .label { 
+            color: var(--text-muted); 
+            margin-top: 0.5rem;
+            font-weight: 500;
+        }
+
+
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-header h2 { font-size: 2rem; margin-bottom: 1rem; }
+        .section-header p { color: var(--text-muted); max-width: 600px; margin: 0 auto; }
+
+        .features-section {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: rgba(19, 25, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: featureIn 0.5s ease-out forwards;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:nth-child(1) { animation-delay: 0.1s; }
+        .feature-card:nth-child(2) { animation-delay: 0.2s; }
+        .feature-card:nth-child(3) { animation-delay: 0.3s; }
+        .feature-card:nth-child(4) { animation-delay: 0.4s; }
+        .feature-card:nth-child(5) { animation-delay: 0.5s; }
+        .feature-card:nth-child(6) { animation-delay: 0.6s; }
+        .feature-card:nth-child(7) { animation-delay: 0.7s; }
+        .feature-card:nth-child(8) { animation-delay: 0.8s; }
+
+        @keyframes featureIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .feature-card h3 {
+            color: var(--text);
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .feature-card ul {
+            list-style: none;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .feature-card ul li {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .feature-card ul li::before {
+            content: '•';
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+            background: var(--dark-tertiary);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .nav-links { display: none; }
+            .stats { flex-direction: column; gap: 2rem; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="bg-effects">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+    </div>
+    
+    <nav>
+        <div class="logo">
+            <img src="logo.png" alt="DevCode Logo" class="logo-img">
+            <span class="logo-text">DevCode</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#home">Home</a></li>
+            <li><a href="#features">Features</a></li>
+        </ul>
+    </nav>
+
+    <section class="hero" id="home">
+        <h1>The Ultimate AI<br><span class="gradient">Coding Platform</span></h1>
+        <p>Built as a local web application wrapped in a desktop shell. Experience enterprise-grade UI, real-time AI text streaming, and an interactive terminal environment powered by node-pty.</p>
+        
+        <div class="active-users">
+            <span class="pulse-dot"></span>
+            <span class="user-count" id="active-users-count">--</span>
+            <span>Active Developers</span>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="stat-item">
+            <div class="value">Local</div>
+            <div class="label">Web & Desktop App</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">Groq</div>
+            <div class="label">LLM Integration</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">Live</div>
+            <div class="label">File System Sync</div>
+        </div>
+    </section>
+
+    <section class="features-section" id="features">
+        <div class="section-header">
+            <h2>Platform Features</h2>
+            <p>Everything you need for an AI-native development experience, right out of the box.</p>
+        </div>
+        <div class="features">
+            <div class="feature-card">
+                <span class="feature-icon">🧠</span>
+                <h3>Core AI Capabilities</h3>
+                <ul>
+                    <li>Context-aware code generation</li>
+                    <li>Inline autocomplete</li>
+                    <li>Natural language to code</li>
+                    <li>Code explanation & refactoring</li>
+                    <li>Bug detection and auto-fix</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">📂</span>
+                <h3>Project Intelligence</h3>
+                <ul>
+                    <li>Full codebase indexing</li>
+                    <li>Cross-file reasoning</li>
+                    <li>Dependency awareness</li>
+                    <li>Architecture suggestions</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">⚡</span>
+                <h3>Power Features</h3>
+                <ul>
+                    <li>"Plan before code" mode</li>
+                    <li>Multi-file edits with rollback</li>
+                    <li>AI agents for autonomous tasks</li>
+                    <li>Voice input for coding</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🛠️</span>
+                <h3>Developer Workflow</h3>
+                <ul>
+                    <li>Integrated IDE experience</li>
+                    <li>Version control awareness</li>
+                    <li>Interactive terminal generation</li>
+                    <li>Test & CI/CD setup suggestions</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🔍</span>
+                <h3>Debugging & Learning</h3>
+                <ul>
+                    <li>Step-by-step debugging help</li>
+                    <li>Error message explanation</li>
+                    <li>Interactive learning mode</li>
+                    <li>Code simulation & visualization</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎯</span>
+                <h3>Personalization</h3>
+                <ul>
+                    <li>Custom AI models/tuning</li>
+                    <li>Prompt templates & macros</li>
+                    <li>Adjustable verbosity</li>
+                    <li>Privacy controls & local mode</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🧩</span>
+                <h3>Collaboration</h3>
+                <ul>
+                    <li>Shared AI sessions</li>
+                    <li>Code review assistant</li>
+                    <li>Documentation generation</li>
+                    <li>Knowledge base integration</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">💻</span>
+                <h3>Under the Hood</h3>
+                <ul>
+                    <li>React + Vite + Monaco Editor</li>
+                    <li>Electron Desktop Wrapper</li>
+                    <li>Express.js + WebSockets + node-pty</li>
+                    <li>Server-Sent Events (SSE)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+
+
+    <footer>
+        <p>© 2026 DevCode. The Future of Software Engineering.</p>
+    </footer>
+
+    <script>
+        // Number counting animation
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Calculate current value and ease out
+                const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+                const current = Math.floor(easeOutQuart * (end - start) + start);
+                
+                obj.innerHTML = current;
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = end;
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Fetch active users from backend
+        async function fetchActiveUsers() {
+            try {
+                // If you host the backend somewhere else, replace this URL.
+                // Assuming the frontend and backend are hosted together for now.
+                const res = await fetch('/api/active-users');
+                const data = await res.json();
+                
+                const countEl = document.getElementById('active-users-count');
+                const currentVal = parseInt(countEl.innerText) || 0;
+                const targetVal = data.active_users;
+                
+                // Animate change
+                if (currentVal !== targetVal) {
+                    animateValue(countEl, currentVal, targetVal, 1500);
+                }
+            } catch (err) {
+                console.error("Failed to fetch active users:", err);
+                // Fallback demo animation if backend is unreachable
+                const countEl = document.getElementById('active-users-count');
+                if (countEl.innerText === '--') {
+                    animateValue(countEl, 0, 142, 1500);
+                }
+            }
+        }
+
+        // Fetch on load and set polling interval
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchActiveUsers();
+            // Poll every 10 seconds to update the count
+            setInterval(fetchActiveUsers, 10000);
+        });
+    </script>
+</body>
+</html>

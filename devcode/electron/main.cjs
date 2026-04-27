@@ -1,0 +1,80 @@
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
+const path = require('path')
+const fs = require('fs')
+
+const isDev = !app.isPackaged
+
+function getStatePath() {
+  return path.join(app.getPath('userData'), 'state.json')
+}
+
+function readState() {
+  try {
+    return JSON.parse(fs.readFileSync(getStatePath(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function writeState(next) {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true })
+  fs.writeFileSync(getStatePath(), JSON.stringify(next, null, 2))
+}
+
+async function createWindow() {
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    backgroundColor: '#ffffff',
+    title: 'devcode',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
+  })
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  if (isDev) {
+    await win.loadURL('http://localhost:5173/')
+    win.webContents.openDevTools({ mode: 'detach' })
+  } else {
+    await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  }
+}
+
+app.whenReady().then(async () => {
+  ipcMain.handle('devcode:selectFolder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Open Project Folder',
+    })
+    if (result.canceled) return null
+    const folderPath = result.filePaths[0]
+    const state = readState()
+    writeState({ ...state, lastProjectPath: folderPath })
+    return folderPath
+  })
+
+  ipcMain.handle('devcode:getState', async () => readState())
+  ipcMain.handle('devcode:setState', async (_evt, patch) => {
+    const state = readState()
+    const next = { ...state, ...patch }
+    writeState(next)
+    return next
+  })
+
+  await createWindow()
+
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) await createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})

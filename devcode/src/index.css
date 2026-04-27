@@ -1,0 +1,93 @@
+:root {
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --panel-2: #f4f4f5;
+  --panel-hover: #e4e4e7;
+  --text: #27272a;
+  --text-h: #09090b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  
+  --blue: #0066ff;
+  --blue-2: #005ce6;
+  --blue-soft: rgba(0, 102, 255, 0.08);
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 12px 24px rgba(0,0,0,0.06), 0 4px 8px rgba(0,0,0,0.04);
+  --ring: rgba(0, 102, 255, 0.2);
+
+  --sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, monospace;
+
+  color-scheme: light;
+  font: 13px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html[data-theme='dark'] {
+  --bg: #09090b;
+  --panel: #111113;
+  --panel-2: #18181b;
+  --panel-hover: #27272a;
+  --text: #a1a1aa;
+  --text-h: #fafafa;
+  --muted: #71717a;
+  --border: #27272a;
+  
+  --blue: #3b82f6;
+  --blue-2: #2563eb;
+  --blue-soft: rgba(59, 130, 246, 0.12);
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.5);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 16px 32px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.4);
+  --ring: rgba(59, 130, 246, 0.4);
+  
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
