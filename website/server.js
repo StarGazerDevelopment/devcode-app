@@ -9,10 +9,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Initialize Supabase Client
-const supabaseUrl = process.env.SUPABASE_URL || 'https://xyzcompany.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'public-anon-key';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase Client (Only if valid URL is provided)
+let supabase = null;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (supabaseUrl && supabaseUrl.startsWith('http')) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+    } catch (err) {
+        console.error('Supabase initialization failed:', err.message);
+    }
+}
 
 // In-memory fallback if no DB (will reset per Vercel serverless instance spin-up)
 const activeSessions = new Map();
@@ -23,9 +31,8 @@ app.post('/api/ping', async (req, res) => {
         const { userId } = req.body;
         if (!userId) return res.status(400).json({ error: 'userId is required' });
 
-        if (process.env.SUPABASE_URL && process.env.SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        if (supabase) {
             // Upsert into active_sessions table with the current timestamp
-            // Assume table has columns: id (text/uuid), last_seen (timestamp with time zone)
             await supabase
                 .from('active_sessions')
                 .upsert({ id: String(userId), last_seen: new Date().toISOString() });
@@ -45,8 +52,7 @@ app.get('/api/active-users', async (req, res) => {
     try {
         let count = 0; // True base value
 
-        // Try to fetch from Supabase if env vars are properly configured
-        if (process.env.SUPABASE_URL && process.env.SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        if (supabase) {
             // Count users who have pinged in the last 2 minutes
             const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
             const { count: activeCount, error } = await supabase
