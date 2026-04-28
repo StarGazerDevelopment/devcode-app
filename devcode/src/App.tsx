@@ -186,20 +186,6 @@ function App() {
     if (r.ok) setTree(r.tree)
   }
 
-  async function openProjectFolder() {
-    const selected = (await window.devcode?.selectFolder?.()) ?? null
-    if (!selected) return
-    const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: selected })
-    if (!r.ok) return
-    setProjectRoot(r.projectRoot)
-    setOpenFiles([])
-    setActivePath(null)
-    setFileContents({})
-    setDirtyFiles({})
-    await refreshTree()
-    await loadChat('default')
-  }
-
   async function initProject() {
     const s = await apiGet<{ settings: { onboarded: boolean, theme: string }, env: Record<string, string> }>('/api/settings')
     if (s.ok) {
@@ -251,7 +237,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      const CURRENT_VERSION = '1.0.3'
+      const CURRENT_VERSION = '1.0.4'
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
       const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
       if (!res.ok) return
@@ -497,15 +483,23 @@ function App() {
   }
 
   async function pickNewProject() {
-    if (window.devcode?.selectFolder) {
-      const p = await window.devcode.selectFolder()
-      if (p) {
-        await apiPost('/api/projects', { projectRoot: p })
-        const pr = await apiGet<{ projects: string[] }>('/api/projects')
-        if (pr.ok) setGlobalProjects(pr.projects)
-        await openGlobalProject(p)
+    try {
+      if (window.devcode?.selectFolder) {
+        const p = await window.devcode.selectFolder()
+        if (p) {
+          await apiPost('/api/projects', { projectRoot: p })
+          const pr = await apiGet<{ projects: string[] }>('/api/projects')
+          if (pr.ok) setGlobalProjects(pr.projects)
+          await openGlobalProject(p)
+        }
       }
+    } catch (err) {
+      console.error('Failed to pick project:', err)
     }
+  }
+
+  async function openProjectFolder() {
+    await pickNewProject()
   }
 
   const providers = [
@@ -551,13 +545,47 @@ function App() {
             +
           </div>
         </div>
-        <div className="global-settings-btn" onClick={() => setShowSettings(true)} title="Settings">
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', marginTop: 'auto' }}>
+          <div style={{ width: '32px', height: 1, background: 'var(--border-color)', margin: '0' }} />
+          
+          <div 
+            className={showExplorer ? 'activityIcon active' : 'activityIcon'} 
+            onClick={() => setShowExplorer(!showExplorer)}
+            title="Explorer"
+          >
+            <Folder size={20} />
+          </div>
+          <div 
+            className={showChat ? 'activityIcon active' : 'activityIcon'} 
+            onClick={() => setShowChat(!showChat)}
+            title="Chat"
+          >
+            <MessageSquare size={20} />
+          </div>
+          <div 
+            className={showTerminal ? 'activityIcon active' : 'activityIcon'} 
+            onClick={() => setShowTerminal(!showTerminal)}
+            title="Terminal"
+          >
+            <TerminalSquare size={20} />
+          </div>
+          <div 
+            className="activityIcon" 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title="Toggle Theme"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </div>
+        </div>
+        <div className="global-settings-btn" onClick={() => setShowSettings(true)} title="Settings" style={{ marginTop: 16 }}>
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </div>
       </div>
 
       {/* MAIN APP CONTAINER */}
       <div className="app">
+        <div className="workspace">
       {/* UPDATE MODAL */}
       {showUpdateModal && updateAvailable && (
         <div className="update-modal-overlay">
@@ -707,39 +735,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* HEADER */}
-        <div className="activityBar">
-        <div 
-          className={showExplorer ? 'activityIcon active' : 'activityIcon'} 
-          onClick={() => setShowExplorer(!showExplorer)}
-          title="Explorer"
-        >
-          <Folder size={20} />
-        </div>
-        <div 
-          className={showChat ? 'activityIcon active' : 'activityIcon'} 
-          onClick={() => setShowChat(!showChat)}
-          title="Chat"
-        >
-          <MessageSquare size={20} />
-        </div>
-        <div className="grow" />
-        <div 
-          className={showTerminal ? 'activityIcon active' : 'activityIcon'} 
-          onClick={() => setShowTerminal(!showTerminal)}
-          title="Terminal"
-        >
-          <TerminalSquare size={20} />
-        </div>
-        <div 
-          className="activityIcon" 
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          title="Toggle Theme"
-        >
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-        </div>
-      </div>
 
       {/* Chat Sidebar (Left) */}
       {showChat && (
@@ -992,6 +987,7 @@ function App() {
           </div>
         </aside>
       )}
+        </div>
       </div>
     </div>
   )
