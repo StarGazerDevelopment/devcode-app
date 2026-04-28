@@ -71,6 +71,40 @@ app.whenReady().then(async () => {
     return next
   })
 
+  ipcMain.handle('devcode:getVersion', () => app.getVersion())
+
+  ipcMain.handle('devcode:downloadAndInstall', async (event, url) => {
+    const os = require('os')
+    const tempDir = path.join(os.homedir(), '.devcode')
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+    const installerPath = path.join(tempDir, 'devcode_update_installer.exe')
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`Unexpected response: ${response.statusText}`)
+      
+      const fileStream = fs.createWriteStream(installerPath)
+      const { Readable } = require('stream')
+      const { finished } = require('stream/promises')
+      
+      await finished(Readable.fromWeb(response.body).pipe(fileStream))
+      
+      // Run the installer detached
+      const child = spawn(installerPath, ['/S', '/force'], {
+        detached: true,
+        stdio: 'ignore'
+      })
+      child.unref()
+
+      // Quit app to allow installation
+      app.quit()
+      return true
+    } catch (e) {
+      console.error('Failed to download update:', e)
+      throw e
+    }
+  })
+
   await createWindow()
 
   if (!isDev) {

@@ -60,6 +60,7 @@ function App() {
   const [globalProjects, setGlobalProjects] = useState<string[]>([])
   const [showSettings, setShowSettings] = useState(false)
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('GROQ_API_KEY')
 
   const chatLogRef = useRef<HTMLDivElement | null>(null)
   
@@ -68,6 +69,24 @@ function App() {
   const termInstance = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+
+  async function handleUpdate() {
+    if (!updateAvailable?.url) return
+    if (window.devcode?.downloadAndInstall) {
+      setIsDownloading(true)
+      try {
+        await window.devcode.downloadAndInstall(updateAvailable.url)
+      } catch (err: any) {
+        console.error('Download failed:', err)
+        alert(`Failed to download update: ${err.message}`)
+        setIsDownloading(false)
+      }
+    } else {
+      // Fallback for web version
+      window.open(updateAvailable.url, '_blank')
+      if (!updateAvailable.forced) setShowUpdateModal(false)
+    }
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -186,6 +205,8 @@ function App() {
     if (r.ok) setTree(r.tree)
   }
 
+  const [isDownloading, setIsDownloading] = useState(false)
+  
   async function initProject() {
     const s = await apiGet<{ settings: { onboarded: boolean, theme: string }, env: Record<string, string> }>('/api/settings')
     if (s.ok) {
@@ -237,7 +258,11 @@ function App() {
 
   async function checkUpdate() {
     try {
-      const CURRENT_VERSION = '1.0.5'
+      let CURRENT_VERSION = '1.0.6'
+      if (window.devcode?.getVersion) {
+        CURRENT_VERSION = await window.devcode.getVersion()
+      }
+
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
       const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
       if (!res.ok) return
@@ -607,14 +632,14 @@ function App() {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{updateAvailable.releaseNotes}</ReactMarkdown>
             </div>
             <div className="update-actions">
-              {!updateAvailable.forced && (
-                <button className="btn outline" onClick={handleRemindMe}>
+              {!updateAvailable.forced && !isDownloading && (
+                <button className="btn outline" onClick={handleRemindMe} disabled={isDownloading}>
                   Remind me in 3 days
                 </button>
               )}
-              <a href={updateAvailable.url} target="_blank" rel="noreferrer" className="btn primary" onClick={() => !updateAvailable.forced && setShowUpdateModal(false)}>
-                <Download size={16} /> Download Update
-              </a>
+              <button className="btn primary" onClick={handleUpdate} disabled={isDownloading}>
+                <Download size={16} /> {isDownloading ? 'Downloading & Installing...' : 'Download Update'}
+              </button>
             </div>
           </div>
         </div>
@@ -675,18 +700,26 @@ function App() {
                 <p style={{ color: 'var(--fg-secondary)', marginBottom: '1.5rem' }}>Enter an API key from your preferred provider to get started.</p>
                 
                 <div style={{ textAlign: 'left', maxHeight: '40vh', overflowY: 'auto', paddingRight: '1rem', marginBottom: '2rem' }}>
-                  {providers.map(p => (
-                    <div key={p.id} style={{ marginBottom: '1rem' }}>
-                      <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>{p.name} API Key</label>
-                      <input 
-                        type="password" 
-                        placeholder={`Enter ${p.name} API Key...`} 
-                        value={apiKeys[p.id] || ''}
-                        onChange={(e) => setApiKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
-                        className="api-input"
-                      />
-                    </div>
-                  ))}
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>Select Provider</label>
+                  <select 
+                    className="devcode-input"
+                    value={selectedProviderId}
+                    onChange={(e) => setSelectedProviderId(e.target.value)}
+                    style={{ marginBottom: '1rem', width: '100%', padding: '0.5rem', background: 'var(--panel-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 4 }}
+                  >
+                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>
+                    {providers.find(p => p.id === selectedProviderId)?.name} API Key
+                  </label>
+                  <input 
+                    type="password" 
+                    placeholder={`Enter API Key...`} 
+                    value={apiKeys[selectedProviderId] || ''}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, [selectedProviderId]: e.target.value }))}
+                    className="api-input"
+                  />
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
@@ -722,18 +755,28 @@ function App() {
               <h3 style={{ marginBottom: '1rem', color: 'var(--fg-secondary)' }}>API Providers</h3>
               <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '1rem' }}>Keys are stored locally in your ~/.devcode folder.</p>
               
-              {providers.map(p => (
-                <div key={p.id} style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>{p.name} API Key</label>
-                  <input 
-                    type="password" 
-                    placeholder={`Enter ${p.name} API Key...`} 
-                    value={apiKeys[p.id] || ''}
-                    onChange={(e) => setApiKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
-                    className="api-input"
-                  />
-                </div>
-              ))}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>Select Provider</label>
+                <select 
+                  className="devcode-input"
+                  value={selectedProviderId}
+                  onChange={(e) => setSelectedProviderId(e.target.value)}
+                  style={{ marginBottom: '1rem', width: '100%', padding: '0.5rem', background: 'var(--panel-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 4 }}
+                >
+                  {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>
+                  {providers.find(p => p.id === selectedProviderId)?.name} API Key
+                </label>
+                <input 
+                  type="password" 
+                  placeholder={`Enter API Key...`} 
+                  value={apiKeys[selectedProviderId] || ''}
+                  onChange={(e) => setApiKeys(prev => ({ ...prev, [selectedProviderId]: e.target.value }))}
+                  className="api-input"
+                />
+              </div>
             </div>
 
             <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
@@ -995,7 +1038,7 @@ function App() {
                 filter: theme === 'dark' ? 'drop-shadow(0 0 16px rgba(59,130,246,0.2))' : 'drop-shadow(0 4px 12px rgba(0,0,0,0.05))'
               }} 
             />
-            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.5</span>
+            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.6</span>
           </div>
         </aside>
       )}
