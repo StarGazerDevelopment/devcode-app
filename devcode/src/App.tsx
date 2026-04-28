@@ -251,7 +251,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      const CURRENT_VERSION = '1.0.2'
+      const CURRENT_VERSION = '1.0.3'
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
       const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
       if (!res.ok) return
@@ -975,7 +975,7 @@ function App() {
           </div>
           
           {/* Logo at the bottom right */}
-          <div style={{ padding: 32, display: 'flex', justifyContent: 'center', alignItems: 'center', borderTop: '1px solid var(--border)', background: 'var(--panel-2)' }}>
+          <div style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderTop: '1px solid var(--border)', background: 'var(--panel-2)' }}>
             <img 
               src={logo} 
               alt="devcode logo" 
@@ -988,6 +988,7 @@ function App() {
                 filter: theme === 'dark' ? 'drop-shadow(0 0 16px rgba(59,130,246,0.2))' : 'drop-shadow(0 4px 12px rgba(0,0,0,0.05))'
               }} 
             />
+            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.3</span>
           </div>
         </aside>
       )}
