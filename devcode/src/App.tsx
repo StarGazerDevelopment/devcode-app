@@ -237,7 +237,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      const CURRENT_VERSION = '1.0.4'
+      const CURRENT_VERSION = '1.0.5'
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
       const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
       if (!res.ok) return
@@ -477,24 +477,36 @@ function App() {
     const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: p })
     if (r.ok) {
       setProjectRoot(r.projectRoot)
+      setOpenFiles([])
+      setActivePath(null)
+      setFileContents({})
+      setDirtyFiles({})
       await refreshTree()
       await loadChat('default')
+    } else {
+      console.error('Failed to open project:', r.error)
+      alert(`Failed to open project folder: ${r.error}`)
     }
   }
 
   async function pickNewProject() {
     try {
+      let p: string | null = null
       if (window.devcode?.selectFolder) {
-        const p = await window.devcode.selectFolder()
-        if (p) {
-          await apiPost('/api/projects', { projectRoot: p })
-          const pr = await apiGet<{ projects: string[] }>('/api/projects')
-          if (pr.ok) setGlobalProjects(pr.projects)
-          await openGlobalProject(p)
-        }
+        p = await window.devcode.selectFolder()
+      } else {
+        p = prompt('Enter absolute path to project folder (fallback since running in browser):')
       }
-    } catch (err) {
+      
+      if (p) {
+        await apiPost('/api/projects', { projectRoot: p })
+        const pr = await apiGet<{ projects: string[] }>('/api/projects')
+        if (pr.ok) setGlobalProjects(pr.projects)
+        await openGlobalProject(p)
+      }
+    } catch (err: any) {
       console.error('Failed to pick project:', err)
+      alert(`Failed to pick project: ${err.message || String(err)}`)
     }
   }
 
@@ -983,7 +995,7 @@ function App() {
                 filter: theme === 'dark' ? 'drop-shadow(0 0 16px rgba(59,130,246,0.2))' : 'drop-shadow(0 4px 12px rgba(0,0,0,0.05))'
               }} 
             />
-            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.3</span>
+            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.5</span>
           </div>
         </aside>
       )}
