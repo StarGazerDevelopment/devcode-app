@@ -61,14 +61,47 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
   const [selectedProviderId, setSelectedProviderId] = useState<string>('GROQ_API_KEY')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>('')
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
+
+  // Fetch models whenever provider or API key changes
+  useEffect(() => {
+    async function fetchModels() {
+      const key = apiKeys[selectedProviderId]
+      if (!key) {
+        setAvailableModels([])
+        return
+      }
+      setIsLoadingModels(true)
+      try {
+        const res = await apiPost<{ models: string[] }>('/api/models', { providerId: selectedProviderId, apiKey: key })
+        if (res.ok) {
+          setAvailableModels(res.models || [])
+          if (res.models && res.models.length > 0 && !res.models.includes(selectedModel)) {
+            setSelectedModel(res.models[0])
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch models', e)
+      } finally {
+        setIsLoadingModels(false)
+      }
+    }
+    const timeout = setTimeout(fetchModels, 500)
+    return () => clearTimeout(timeout)
+  }, [selectedProviderId, apiKeys[selectedProviderId]])
 
   const chatLogRef = useRef<HTMLDivElement | null>(null)
   
-  // Terminal refs
-  const terminalRef = useRef<HTMLDivElement | null>(null)
-  const termInstance = useRef<Terminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
+  // Terminal state
+  const [terminals, setTerminals] = useState<{ id: string; title: string }[]>([{ id: 'term-1', title: 'Terminal 1' }])
+  const [activeTermId, setActiveTermId] = useState<string>('term-1')
+  
+  const terminalRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const termInstances = useRef<Record<string, Terminal | null>>({})
+  const fitAddons = useRef<Record<string, FitAddon | null>>({})
+  const wsRefs = useRef<Record<string, WebSocket | null>>({})
 
   async function handleUpdate() {
     if (!updateAvailable?.url) return
@@ -93,13 +126,15 @@ function App() {
     localStorage.setItem('devcode-theme', theme)
     
     // Update terminal theme if running
-    if (termInstance.current) {
-      termInstance.current.options.theme = {
-        background: theme === 'dark' ? '#18181b' : '#f4f5f7',
-        foreground: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
-        cursor: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
+    Object.values(termInstances.current).forEach(term => {
+      if (term) {
+        term.options.theme = {
+          background: theme === 'dark' ? '#18181b' : '#f4f5f7',
+          foreground: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
+          cursor: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
+        }
       }
-    }
+    })
   }, [theme])
 
   // Live active users heartbeat
@@ -130,79 +165,123 @@ function App() {
     }
   }, [chat.messages])
 
-  // Initialize interactive terminal
+  // Initialize interactive terminals
   useEffect(() => {
-    if (!showTerminal || !projectRoot || !terminalRef.current) return
-    if (termInstance.current) return
+    if (!showTerminal || !projectRoot) return
 
-    const term = new Terminal({
-      fontFamily: "'JetBrains Mono', ui-monospace, Consolas, monospace",
-      fontSize: 13,
-      cursorBlink: true,
-      theme: {
-        background: theme === 'dark' ? '#18181b' : '#f4f5f7',
-        foreground: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
-        cursor: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
-      }
-    })
-    
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    term.open(terminalRef.current)
-    
-    // small delay to ensure container is fully rendered before fitting
-    setTimeout(() => fitAddon.fit(), 10)
+    const cleanupFns: Array<() => void> = []
 
-    termInstance.current = term
-    fitAddonRef.current = fitAddon
+    terminals.forEach((termItem) => {
+      const id = termItem.id
+      const container = terminalRefs.current[id]
+      if (!container || termInstances.current[id]) return
 
-    const wsUrl = `ws://localhost:3030/api/terminal/pty?cwd=${encodeURIComponent(projectRoot)}`
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      term.onData((data) => ws.send(data))
-      term.onResize(({ cols, rows }) => {
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }))
+      const term = new Terminal({
+        fontFamily: "'JetBrains Mono', ui-monospace, Consolas, monospace",
+        fontSize: 13,
+        cursorBlink: true,
+        theme: {
+          background: theme === 'dark' ? '#18181b' : '#f4f5f7',
+          foreground: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
+          cursor: theme === 'dark' ? '#e4e4e7' : '#1a1a1a',
+        }
       })
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-    }
-
-    ws.onmessage = (ev) => {
-      const text = ev.data as string
-      term.write(text)
       
-      // Basic URL extraction from terminal output to update preview links
-      const re = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?[^\s'"]*/gi
-      const found = [...text.matchAll(re)].map(m => m[0])
-      if (found.length) {
-        setUrls(prev => {
-          const next = [...new Set([...prev, ...found])]
-          if (next.length !== prev.length && !previewUrl) {
-            setPreviewUrl(next[0])
-          }
-          return next
+      const fitAddon = new FitAddon()
+      term.loadAddon(fitAddon)
+      term.open(container)
+      
+      setTimeout(() => fitAddon.fit(), 10)
+
+      termInstances.current[id] = term
+      fitAddons.current[id] = fitAddon
+
+      const wsUrl = `ws://localhost:3030/api/terminal/pty?cwd=${encodeURIComponent(projectRoot)}`
+      const ws = new WebSocket(wsUrl)
+      wsRefs.current[id] = ws
+
+      ws.onopen = () => {
+        term.onData((data) => ws.send(data))
+        term.onResize(({ cols, rows }) => {
+          ws.send(JSON.stringify({ type: 'resize', cols, rows }))
         })
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
-    }
+
+      ws.onmessage = (ev) => {
+        const text = ev.data as string
+        term.write(text)
+        
+        const re = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?[^\s'"]*/gi
+        const found = [...text.matchAll(re)].map(m => m[0])
+        if (found.length) {
+          setUrls(prev => {
+            const next = [...new Set([...prev, ...found])]
+            if (next.length !== prev.length && !previewUrl) {
+              setPreviewUrl(next[0])
+            }
+            return next
+          })
+        }
+      }
+
+      cleanupFns.push(() => {
+        term.dispose()
+        ws.close()
+        delete termInstances.current[id]
+        delete fitAddons.current[id]
+        delete wsRefs.current[id]
+      })
+    })
 
     const handleResize = () => {
-      if (fitAddonRef.current) fitAddonRef.current.fit()
+      Object.values(fitAddons.current).forEach(addon => addon?.fit())
     }
     window.addEventListener('resize', handleResize)
 
     return () => {
       window.removeEventListener('resize', handleResize)
-      term.dispose()
-      ws.close()
-      termInstance.current = null
-      wsRef.current = null
+      cleanupFns.forEach(fn => fn())
     }
-  }, [showTerminal, projectRoot])
+  }, [showTerminal, projectRoot, terminals])
+
+  useEffect(() => {
+    // Re-fit when active terminal changes to ensure it sizes correctly if it was hidden
+    if (activeTermId && fitAddons.current[activeTermId]) {
+      setTimeout(() => fitAddons.current[activeTermId]?.fit(), 10)
+    }
+  }, [activeTermId])
+
+  function addTerminal() {
+    const id = 'term-' + Date.now()
+    setTerminals(prev => [...prev, { id, title: `Terminal ${prev.length + 1}` }])
+    setActiveTermId(id)
+  }
+
+  function closeTerminal(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setTerminals(prev => {
+      const next = prev.filter(t => t.id !== id)
+      if (activeTermId === id) {
+        setActiveTermId(next.length ? next[next.length - 1].id : '')
+      }
+      return next
+    })
+  }
 
   async function refreshTree() {
-    const r = await apiGet<{ tree: FsTree }>('/api/fs/tree?dir=.')
-    if (r.ok) setTree(r.tree)
+    if (!projectRoot) return
+    if (window.devcode?.fsTree) {
+      try {
+        const treeData = await window.devcode.fsTree(projectRoot, '.')
+        setTree(treeData)
+      } catch (err) {
+        console.error('Failed to refresh tree via IPC:', err)
+      }
+    } else {
+      const r = await apiGet<{ tree: FsTree }>('/api/fs/tree?dir=.')
+      if (r.ok) setTree(r.tree)
+    }
   }
 
   const [isDownloading, setIsDownloading] = useState(false)
@@ -217,6 +296,9 @@ function App() {
         setTheme(s.settings.theme as 'light'|'dark')
       }
       setApiKeys(s.env || {})
+      if (s.env && s.env.DEVCODE_MODEL) {
+        setSelectedModel(s.env.DEVCODE_MODEL)
+      }
     }
 
     const pr = await apiGet<{ projects: string[] }>('/api/projects')
@@ -491,7 +573,8 @@ function App() {
   }
 
   async function completeOnboarding() {
-    await apiPost('/api/settings', { settings: { onboarded: true, theme }, env: apiKeys })
+    const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel }
+    await apiPost('/api/settings', { settings: { onboarded: true, theme }, env: finalEnv })
     setShowOnboarding(false)
   }
 
@@ -622,6 +705,14 @@ function App() {
 
       {/* MAIN APP CONTAINER */}
       <div className="app">
+        {/* CUSTOM TITLE BAR */}
+        <div className="titleBar">
+          <div className="titleBarLeft">
+            <img src={logo} alt="logo" className="titleBarLogo" />
+            <span className="titleBarBrand">devcode</span>
+          </div>
+        </div>
+
         <div className="workspace">
       {/* UPDATE MODAL */}
       {showUpdateModal && updateAvailable && (
@@ -720,6 +811,21 @@ function App() {
                     onChange={(e) => setApiKeys(prev => ({ ...prev, [selectedProviderId]: e.target.value }))}
                     className="api-input"
                   />
+                  
+                  {availableModels.length > 0 && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>Default Model</label>
+                      <select 
+                        className="devcode-input"
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', background: 'var(--panel-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 4 }}
+                      >
+                        {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {isLoadingModels && <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.5rem' }}>Loading models...</div>}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
@@ -776,12 +882,28 @@ function App() {
                   onChange={(e) => setApiKeys(prev => ({ ...prev, [selectedProviderId]: e.target.value }))}
                   className="api-input"
                 />
+
+                {availableModels.length > 0 && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--fg-primary)' }}>Default Model</label>
+                    <select 
+                      className="devcode-input"
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      style={{ width: '100%', padding: '0.5rem', background: 'var(--panel-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 4 }}
+                    >
+                      {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                )}
+                {isLoadingModels && <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.5rem' }}>Loading models...</div>}
               </div>
             </div>
 
             <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
               <button className="primaryBtn" onClick={() => {
-                apiPost('/api/settings', { settings: { theme, onboarded: true }, env: apiKeys })
+                const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel }
+                apiPost('/api/settings', { settings: { theme, onboarded: true }, env: finalEnv })
                 setShowSettings(false)
               }}>
                 Save Settings
@@ -958,7 +1080,24 @@ function App() {
         {showTerminal && (
           <section className="terminalPanel">
             <div className="terminalTabs">
-              <div className="terminalTab active">TERMINAL</div>
+              {terminals.map(t => (
+                <div 
+                  key={t.id} 
+                  className={activeTermId === t.id ? "terminalTab active" : "terminalTab"}
+                  onClick={() => setActiveTermId(t.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {t.title}
+                  {terminals.length > 1 && (
+                    <div className="iconBtn" style={{ width: 16, height: 16 }} onClick={(e) => closeTerminal(t.id, e)}>
+                      <X size={10} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="iconBtn" style={{ width: 24, height: 24, marginLeft: 4 }} onClick={addTerminal} title="New Terminal">
+                +
+              </div>
               <div className="grow" />
               {urls.length > 0 && (
                 <div className="chip" style={{ cursor: 'pointer' }} onClick={() => { setPreviewUrl(urls[0]); setTab('preview') }}>
@@ -969,8 +1108,24 @@ function App() {
                 <X size={14} />
               </div>
             </div>
-            <div className="terminalContent" style={{ padding: '8px 12px' }}>
-              <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
+            <div className="terminalContent" style={{ padding: '8px 12px', position: 'relative' }}>
+              {terminals.map(t => (
+                <div 
+                  key={t.id}
+                  ref={(el) => { terminalRefs.current[t.id] = el }} 
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    position: 'absolute',
+                    top: 8,
+                    left: 12,
+                    right: 12,
+                    bottom: 8,
+                    visibility: activeTermId === t.id ? 'visible' : 'hidden',
+                    zIndex: activeTermId === t.id ? 1 : 0
+                  }} 
+                />
+              ))}
             </div>
           </section>
         )}

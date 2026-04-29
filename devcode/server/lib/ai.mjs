@@ -15,7 +15,7 @@ export function createGroqClient() {
 
 export function defaultModel() {
   const globalEnv = getGlobalEnv()
-  return globalEnv.GROQ_MODEL || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+  return globalEnv.DEVCODE_MODEL || globalEnv.GROQ_MODEL || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
 }
 
 export async function runAgent({ groq, model, messages, tools, toolHandlers, onToken, maxSteps = 6 }) {

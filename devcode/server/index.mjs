@@ -50,6 +50,45 @@ app.post('/api/update/remind', (req, res) => {
   }
 })
 
+app.post('/api/models', async (req, res) => {
+  try {
+    const { providerId, apiKey } = req.body
+    if (!apiKey) return res.json({ ok: true, models: [] })
+    
+    let models = []
+    if (providerId === 'GROQ_API_KEY') {
+      const response = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        models = data.data.map(m => m.id)
+      }
+    } else if (providerId === 'OPENAI_API_KEY' || providerId === 'OPENROUTER_API_KEY' || providerId === 'TOGETHER_API_KEY' || providerId === 'DEEPSEEK_API_KEY') {
+      let url = 'https://api.openai.com/v1/models'
+      if (providerId === 'OPENROUTER_API_KEY') url = 'https://openrouter.ai/api/v1/models'
+      if (providerId === 'TOGETHER_API_KEY') url = 'https://api.together.xyz/v1/models'
+      if (providerId === 'DEEPSEEK_API_KEY') url = 'https://api.deepseek.com/models'
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        models = data.data.map(m => m.id)
+      }
+    } else if (providerId === 'ANTHROPIC_API_KEY') {
+      models = ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307']
+    } else if (providerId === 'GEMINI_API_KEY') {
+      models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro']
+    }
+    
+    res.json({ ok: true, models })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/api/settings', (req, res) => {
   try {
     const settings = getGlobalSettings()

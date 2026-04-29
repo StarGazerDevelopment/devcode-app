@@ -4,6 +4,8 @@ import crypto from 'node:crypto'
 import os from 'node:os'
 import pty from 'node-pty'
 
+import fs from 'node:fs'
+
 const runs = new Map()
 
 function extractUrls(text) {
@@ -81,7 +83,14 @@ export function setupPty(wss) {
   wss.on('connection', (ws, req) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
-      const cwd = url.searchParams.get('cwd') || process.cwd()
+      let cwd = url.searchParams.get('cwd') || process.cwd()
+      try {
+        if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
+          cwd = os.homedir()
+        }
+      } catch {
+        cwd = os.homedir()
+      }
       const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash'
 
       const ptyProcess = pty.spawn(shell, [], {

@@ -62,7 +62,7 @@ export function getProjects() {
 
 export function addProject(projectRoot) {
   const projects = getProjects()
-  if (!projects.includes(projectRoot)) {
+  if (!projects.includes(projectRoot) && !projectRoot.endsWith('.devcode')) {
     projects.push(projectRoot)
     const pPath = path.join(GLOBAL_DIR, 'projects.json')
     fs.writeFileSync(pPath, JSON.stringify(projects, null, 2), 'utf8')

@@ -301,6 +301,7 @@ html[data-theme='dark'] .titleBar {
 
 .sidebar {
   width: 380px;
+  max-width: 40vw;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   background: var(--panel);
@@ -313,6 +314,7 @@ html[data-theme='dark'] .titleBar {
 
 .explorerSidebar {
   width: 260px;
+  max-width: 30vw;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--panel);

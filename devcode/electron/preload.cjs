@@ -6,4 +6,14 @@ contextBridge.exposeInMainWorld('devcode', {
   setState: (patch) => ipcRenderer.invoke('devcode:setState', patch),
   getVersion: () => ipcRenderer.invoke('devcode:getVersion'),
   downloadAndInstall: (url) => ipcRenderer.invoke('devcode:downloadAndInstall', url),
+  
+  // Folder Fetch Logic (IPC)
+  fsTree: (root, dir) => ipcRenderer.invoke('fs:tree', root, dir),
+  fsRead: (root, path) => ipcRenderer.invoke('fs:read', root, path),
+  fsWrite: (root, path, content) => ipcRenderer.invoke('fs:write', root, path, content),
+  fsWatch: (root, callback) => {
+    ipcRenderer.removeAllListeners('fs:watch:change')
+    ipcRenderer.on('fs:watch:change', (e, data) => callback(data))
+    return ipcRenderer.invoke('fs:watch', root)
+  }
 })

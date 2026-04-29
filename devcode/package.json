@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.7",
   "type": "module",
+  "author": "StarGazerDevelopment",
+  "description": "DevCode IDE",
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:web": "vite",

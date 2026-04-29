@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
+const chokidar = require('chokidar')
 
 const isDev = !app.isPackaged
 
@@ -24,12 +25,93 @@ function writeState(next) {
   fs.writeFileSync(getStatePath(), JSON.stringify(next, null, 2))
 }
 
+// -----------------------
+// Folder Fetch Logic (IPC)
+// -----------------------
+async function listDir(root, dir) {
+  const target = path.resolve(root, dir)
+  if (!target.startsWith(root)) throw new Error('Outside root')
+  const entries = await fs.promises.readdir(target, { withFileTypes: true })
+  return entries.map(e => ({ name: e.name, type: e.isDirectory() ? 'dir' : 'file' }))
+}
+
+async function buildTree(root, relDir, options, currentDepth = 0) {
+  const target = path.resolve(root, relDir)
+  if (!target.startsWith(root)) throw new Error('Outside root')
+  
+  if (currentDepth > options.maxDepth) return { path: relDir, type: 'dir', children: [], truncated: true }
+  
+  const entries = await fs.promises.readdir(target, { withFileTypes: true }).catch(() => [])
+  
+  if (entries.length > options.maxEntries) {
+    return { path: relDir, type: 'dir', children: [], truncated: true }
+  }
+  
+  const children = []
+  for (const e of entries) {
+    if (e.name.startsWith('.git') || e.name === 'node_modules') continue
+    const childRel = relDir === '.' ? e.name : `${relDir}/${e.name}`
+    if (e.isDirectory()) {
+      children.push(await buildTree(root, childRel, options, currentDepth + 1))
+    } else {
+      children.push({ path: childRel, type: 'file' })
+    }
+  }
+  return { path: relDir, type: 'dir', children }
+}
+
+let activeWatcher = null
+
+function setupWatcher(root, webContents) {
+  if (activeWatcher) {
+    activeWatcher.close()
+  }
+  activeWatcher = chokidar.watch(root, {
+    ignored: /(^|[\/\\])\../,
+    persistent: true,
+    ignoreInitial: true
+  })
+  
+  activeWatcher.on('all', (event, p) => {
+    const rel = path.relative(root, p).replace(/\\/g, '/')
+    webContents.send('fs:watch:change', { event, path: rel })
+  })
+}
+
+ipcMain.handle('fs:tree', async (e, root, dir) => {
+  return await buildTree(root, dir || '.', { maxDepth: 8, maxEntries: 5000 })
+})
+
+ipcMain.handle('fs:read', async (e, root, p) => {
+  const target = path.resolve(root, p)
+  if (!target.startsWith(root)) throw new Error('Outside root')
+  return await fs.promises.readFile(target, 'utf8')
+})
+
+ipcMain.handle('fs:write', async (e, root, p, content) => {
+  const target = path.resolve(root, p)
+  if (!target.startsWith(root)) throw new Error('Outside root')
+  await fs.promises.mkdir(path.dirname(target), { recursive: true })
+  await fs.promises.writeFile(target, content, 'utf8')
+  return true
+})
+
+ipcMain.handle('fs:watch', (e, root) => {
+  setupWatcher(root, e.sender)
+  return true
+})
+
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     backgroundColor: '#ffffff',
     title: 'devcode',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#ffffff',
+      symbolColor: '#000000'
+    },
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -116,10 +198,9 @@ app.whenReady().then(async () => {
   await createWindow()
 
   if (!isDev) {
-    const serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server', 'index.mjs')
-    serverProcess = spawn(process.execPath, [serverPath], {
-      env: { ...process.env, NODE_ENV: 'production', ELECTRON_RUN_AS_NODE: '1' },
-      stdio: 'inherit'
+    const serverPath = path.join(process.resourcesPath, 'app.asar', 'server', 'index.mjs')
+    import('file://' + serverPath).catch(err => {
+      fs.writeFileSync(path.join(app.getPath('userData'), 'server.log'), '[ERROR] ' + err.stack + '\n')
     })
   }
 
