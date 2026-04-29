@@ -258,13 +258,13 @@ function App() {
 
   async function checkUpdate() {
     try {
-      let CURRENT_VERSION = '1.0.6'
+      let CURRENT_VERSION = '1.0.7'
       if (window.devcode?.getVersion) {
         CURRENT_VERSION = await window.devcode.getVersion()
       }
 
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
-      const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/devcode.config?t=' + Date.now())
+      const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/.devcode?t=' + Date.now())
       if (!res.ok) return
       const config = await res.json()
 
@@ -1038,7 +1038,7 @@ function App() {
                 filter: theme === 'dark' ? 'drop-shadow(0 0 16px rgba(59,130,246,0.2))' : 'drop-shadow(0 4px 12px rgba(0,0,0,0.05))'
               }} 
             />
-            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.6</span>
+            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.7</span>
           </div>
         </aside>
       )}

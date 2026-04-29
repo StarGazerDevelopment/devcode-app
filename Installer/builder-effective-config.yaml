@@ -8,6 +8,7 @@ files:
       - dist/**/*
       - electron/**/*
       - server/**/*
+      - .devcode
       - package.json
 win:
   target: nsis

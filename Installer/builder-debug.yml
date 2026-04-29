@@ -5,6 +5,7 @@ x64:
     - dist/**/*
     - electron/**/*
     - server/**/*
+    - .devcode
     - package.json
     - '!**/*.{iml,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,suo,xproj,cc,d.ts,mk,a,o,obj,forge-meta,pdb}'
     - '!**/._*'
@@ -18,6 +19,7 @@ x64:
     - dist/**/*
     - electron/**/*
     - server/**/*
+    - .devcode
     - package.json
 nsis:
   script: |-
@@ -95,8 +97,8 @@ nsis:
     !macroend
 
     !addplugindir /x86-unicode "C:\Users\eason\AppData\Local\electron-builder\Cache\nsis\nsis-resources-3.4.1-nsis-resources-3.4.1\plugins\x86-unicode"
-    !include "E:\Temp\t-kgSOhH\2-messages.nsh"
-    !include "E:\Temp\t-kgSOhH\3-messages.nsh"
+    !include "E:\Temp\t-LThds4\2-messages.nsh"
+    !include "E:\Temp\t-LThds4\3-messages.nsh"
 
     Var newStartMenuLink
     Var oldStartMenuLink

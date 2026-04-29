@@ -71,7 +71,15 @@ app.whenReady().then(async () => {
     return next
   })
 
-  ipcMain.handle('devcode:getVersion', () => app.getVersion())
+  ipcMain.handle('devcode:getVersion', () => {
+    try {
+      const devcodeFile = isDev ? path.join(__dirname, '..', '.devcode') : path.join(process.resourcesPath, 'app.asar', '.devcode')
+      const content = JSON.parse(fs.readFileSync(devcodeFile, 'utf8'))
+      return content.version
+    } catch {
+      return app.getVersion()
+    }
+  })
 
   ipcMain.handle('devcode:downloadAndInstall', async (event, url) => {
     const os = require('os')
@@ -109,9 +117,8 @@ app.whenReady().then(async () => {
 
   if (!isDev) {
     const serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server', 'index.mjs')
-    const nodePath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server', 'node.exe')
-    serverProcess = spawn(nodePath, [serverPath], {
-      env: { ...process.env, NODE_ENV: 'production' },
+    serverProcess = spawn(process.execPath, [serverPath], {
+      env: { ...process.env, NODE_ENV: 'production', ELECTRON_RUN_AS_NODE: '1' },
       stdio: 'inherit'
     })
   }

@@ -1,0 +1,6 @@
+{
+  "version": "1.0.7",
+  "forced": true,
+  "downloadUrl": "https://github.com/StarGazerDevelopment/devcode-app/raw/main/Installer/installer.exe",
+  "releaseNotes": "### DevCode 1.0.7\n- Fixed backend fetching issue where the server failed to start correctly on production builds.\n- Moved configuration to a local `.devcode` file instead of package versioning."
+}

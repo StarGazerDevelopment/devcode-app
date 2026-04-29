@@ -1,7 +1,7 @@
 {
   "name": "devcode",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "scripts": {
     "dev": "npm run dev:desktop",
@@ -25,6 +25,7 @@
       "dist/**/*",
       "electron/**/*",
       "server/**/*",
+      ".devcode",
       "package.json"
     ],
     "win": {
