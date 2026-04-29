@@ -1,6 +1,6 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.8",
   "forced": true,
   "downloadUrl": "https://github.com/StarGazerDevelopment/devcode-app/raw/main/Installer/installer.exe",
-  "releaseNotes": "### DevCode 1.0.7\n- Fixed backend fetching issue where the server failed to start correctly on production builds.\n- Moved configuration to a local `.devcode` file instead of package versioning."
+  "releaseNotes": "### DevCode 1.0.8\n- Added terminal tabs, adaptive UI, dynamic model fetching, and custom title bar."
 }
