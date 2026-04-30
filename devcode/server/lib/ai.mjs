@@ -15,18 +15,19 @@ export function createGroqClient() {
 
   if (!apiKey) throw new Error(`Missing ${provider} in API settings`)
 
-  let baseURL = 'https://api.groq.com/openai/v1'
+  let baseURL = undefined
   if (provider === 'OPENAI_API_KEY') baseURL = 'https://api.openai.com/v1'
   if (provider === 'OPENROUTER_API_KEY') baseURL = 'https://openrouter.ai/api/v1'
   if (provider === 'TOGETHER_API_KEY') baseURL = 'https://api.together.xyz/v1'
   if (provider === 'DEEPSEEK_API_KEY') baseURL = 'https://api.deepseek.com'
   if (provider === 'MISTRAL_API_KEY') baseURL = 'https://api.mistral.ai/v1'
   if (provider === 'PERPLEXITY_API_KEY') baseURL = 'https://api.perplexity.ai'
+  if (provider === 'GEMINI_API_KEY') baseURL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
   if (provider === 'AZURE_OPENAI_API_KEY') baseURL = 'https://api.openai.com/v1' // Assuming custom config needed
-  if (provider === 'CUSTOM_ENDPOINT_KEY') baseURL = globalEnv.CUSTOM_ENDPOINT_URL || 'http://localhost:11434/v1'
+  if (provider === 'CUSTOM_ENDPOINT_KEY') baseURL = globalEnv.CUSTOM_ENDPOINT_URL || process.env.CUSTOM_ENDPOINT_URL || 'http://localhost:11434/v1'
 
-  // If Anthropic or Gemini, groq-sdk won't work natively unless it's via a proxy, but let's assume OpenAI compatible for now.
-  // The UI limits them, or we can use generic endpoints.
+  // Note: Anthropic and Cohere do not natively support OpenAI's format without a proxy. 
+  // For Anthropic, you'd typically need a separate SDK or proxy. For now, it will fail unless passed through a proxy.
 
   return new Groq({ apiKey, baseURL })
 }

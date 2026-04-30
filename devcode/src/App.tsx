@@ -354,7 +354,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      let CURRENT_VERSION = '1.1.0'
+      let CURRENT_VERSION = '1.1.1'
       if (window.devcode?.getVersion) {
         CURRENT_VERSION = await window.devcode.getVersion()
       }
@@ -559,6 +559,21 @@ function App() {
                     const idx = msgs.findIndex(m => m.id === assistantId)
                     if (idx !== -1) {
                       msgs[idx] = { ...msgs[idx], content: currentText }
+                    }
+                    return { ...prev, messages: msgs }
+                  })
+                } catch (e) {}
+              }
+            } else if (line.startsWith('event: error')) {
+              const dataStr = line.split('\ndata: ')[1]
+              if (dataStr) {
+                try {
+                  const data = JSON.parse(dataStr)
+                  setChat(prev => {
+                    const msgs = [...prev.messages]
+                    const idx = msgs.findIndex(m => m.id === assistantId)
+                    if (idx !== -1) {
+                      msgs[idx] = { ...msgs[idx], content: currentText + `\n\n**Error:** ${data.error}` }
                     }
                     return { ...prev, messages: msgs }
                   })
