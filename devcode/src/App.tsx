@@ -761,7 +761,7 @@ function App() {
         <div className="workspace">
       {/* UPDATE MODAL */}
       {showUpdateModal && updateAvailable && (
-        <div className="update-modal-overlay">
+        <div className="update-modal-overlay" style={{ zIndex: 999999 }}>
           <div className="update-modal">
             <h2>Update Available ({updateAvailable.version})</h2>
             <div className="update-notes">
@@ -1238,7 +1238,9 @@ function App() {
                 filter: theme === 'dark' ? 'drop-shadow(0 0 16px rgba(59,130,246,0.2))' : 'drop-shadow(0 4px 12px rgba(0,0,0,0.05))'
               }} 
             />
-            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>v1.0.8</span>
+            <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>
+              {updateAvailable ? `v1.0.9 (Update ${updateAvailable.version} Available)` : 'v1.0.9'}
+            </span>
           </div>
         </aside>
       )}
