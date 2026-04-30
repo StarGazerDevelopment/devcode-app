@@ -11,7 +11,7 @@ import { getRun, killRun, startRun } from './lib/terminal.mjs'
 import { searchText } from './lib/search.mjs'
 import os from 'node:os'
 import fs from 'node:fs'
-import { getGlobalSettings, saveGlobalSettings, getGlobalEnv, saveGlobalEnv, getProjects, addProject } from './lib/global.mjs'
+import { getGlobalSettings, saveGlobalSettings, getGlobalEnv, saveGlobalEnv, getProjects, addProject, removeProject } from './lib/global.mjs'
 
 const PORT = Number(process.env.DEVCODE_PORT || 3030)
 const VITE_ORIGIN = process.env.DEVCODE_WEB_ORIGIN || 'http://localhost:5173'
@@ -124,6 +124,17 @@ app.post('/api/projects', (req, res) => {
     const { projectRoot } = req.body
     if (!projectRoot) return res.status(400).json({ ok: false, error: 'Missing projectRoot' })
     const projects = addProject(projectRoot)
+    res.json({ ok: true, projects })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+app.post('/api/projects/remove', (req, res) => {
+  try {
+    const { projectRoot } = req.body
+    if (!projectRoot) return res.status(400).json({ ok: false, error: 'Missing projectRoot' })
+    const projects = removeProject(projectRoot)
     res.json({ ok: true, projects })
   } catch (e) {
     res.json({ ok: false, error: e.message })

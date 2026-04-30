@@ -68,6 +68,9 @@ function App() {
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [isLoadingModels, setIsLoadingModels] = useState(false)
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, projectPath: string } | null>(null)
+
   // Fetch models whenever provider or API key changes
   useEffect(() => {
     async function fetchModels() {
@@ -634,6 +637,11 @@ function App() {
       setActivePath(null)
       setFileContents({})
       setDirtyFiles({})
+      
+      const newTermId = 'term-' + Date.now()
+      setTerminals([{ id: newTermId, title: 'Terminal 1' }])
+      setActiveTermId(newTermId)
+
       await refreshTree()
       await loadChat('default')
     } else {
@@ -660,6 +668,29 @@ function App() {
     } catch (err: any) {
       console.error('Failed to pick project:', err)
       alert(`Failed to pick project: ${err.message || String(err)}`)
+    }
+  }
+
+  useEffect(() => {
+    function handleClickOutside() {
+      if (contextMenu) setContextMenu(null)
+    }
+    window.addEventListener('click', handleClickOutside)
+    return () => window.removeEventListener('click', handleClickOutside)
+  }, [contextMenu])
+
+  async function removeProjectHistory(path: string) {
+    const res = await apiPost<{ projects: string[] }>('/api/projects/remove', { projectRoot: path })
+    if (res.ok) {
+      setGlobalProjects(res.projects)
+      if (projectRoot === path) {
+        setProjectRoot(null)
+        setTree(null)
+        setOpenFiles([])
+        setActivePath(null)
+        setFileContents({})
+        setDirtyFiles({})
+      }
     }
   }
 
@@ -701,6 +732,10 @@ function App() {
                 style={{ backgroundColor: softColor }}
                 title={p}
                 onClick={() => openGlobalProject(p)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  setContextMenu({ x: e.clientX, y: e.clientY, projectPath: p })
+                }}
               >
                 {firstLetter}
               </div>
@@ -710,6 +745,27 @@ function App() {
             +
           </div>
         </div>
+
+        {contextMenu && (
+          <div 
+            className="context-menu" 
+            style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 999999, background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: 'var(--shadow)' }}
+          >
+            <div 
+              className="context-menu-item" 
+              style={{ padding: '8px 16px', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                removeProjectHistory(contextMenu.projectPath)
+                setContextMenu(null)
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-primary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              Remove from History
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', marginTop: 'auto' }}>
           <div style={{ width: '32px', height: 1, background: 'var(--border-color)', margin: '0' }} />

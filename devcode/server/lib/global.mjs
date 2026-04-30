@@ -70,6 +70,16 @@ export function addProject(projectRoot) {
   return projects
 }
 
+export function removeProject(projectRoot) {
+  const projects = getProjects()
+  const filtered = projects.filter(p => p !== projectRoot)
+  if (filtered.length !== projects.length) {
+    const pPath = path.join(GLOBAL_DIR, 'projects.json')
+    fs.writeFileSync(pPath, JSON.stringify(filtered, null, 2), 'utf8')
+  }
+  return filtered
+}
+
 export function getProjectHash(projectRoot) {
   return crypto.createHash('md5').update(projectRoot).digest('hex').substring(0, 12)
 }

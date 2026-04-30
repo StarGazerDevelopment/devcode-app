@@ -31745,6 +31745,15 @@ function addProject(projectRoot) {
   }
   return projects;
 }
+function removeProject(projectRoot) {
+  const projects = getProjects();
+  const filtered = projects.filter((p) => p !== projectRoot);
+  if (filtered.length !== projects.length) {
+    const pPath = import_node_path4.default.join(GLOBAL_DIR, "projects.json");
+    import_node_fs3.default.writeFileSync(pPath, JSON.stringify(filtered, null, 2), "utf8");
+  }
+  return filtered;
+}
 function getProjectHash(projectRoot) {
   return import_node_crypto.default.createHash("md5").update(projectRoot).digest("hex").substring(0, 12);
 }
@@ -32166,6 +32175,16 @@ app.post("/api/projects", (req, res) => {
     const { projectRoot } = req.body;
     if (!projectRoot) return res.status(400).json({ ok: false, error: "Missing projectRoot" });
     const projects = addProject(projectRoot);
+    res.json({ ok: true, projects });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+app.post("/api/projects/remove", (req, res) => {
+  try {
+    const { projectRoot } = req.body;
+    if (!projectRoot) return res.status(400).json({ ok: false, error: "Missing projectRoot" });
+    const projects = removeProject(projectRoot);
     res.json({ ok: true, projects });
   } catch (e) {
     res.json({ ok: false, error: e.message });
