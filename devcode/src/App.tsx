@@ -351,7 +351,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      let CURRENT_VERSION = '1.0.8'
+      let CURRENT_VERSION = '1.0.9'
       if (window.devcode?.getVersion) {
         CURRENT_VERSION = await window.devcode.getVersion()
       }

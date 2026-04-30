@@ -230,10 +230,32 @@ app.whenReady().then(async () => {
       const logPath = path.join(app.getPath('userData'), 'server.log')
       fs.writeFileSync(logPath, 'Starting server at ' + serverPath + '\n')
       
-      serverProcess.stdout.on('data', data => fs.appendFileSync(logPath, '[STDOUT] ' + data.toString()))
-      serverProcess.stderr.on('data', data => fs.appendFileSync(logPath, '[STDERR] ' + data.toString()))
-      serverProcess.on('close', code => fs.appendFileSync(logPath, '[CLOSE] Server exited with code ' + code + '\n'))
-      serverProcess.on('error', err => fs.appendFileSync(logPath, '[ERROR] ' + err.message + '\n'))
+      const isDevMode = process.argv.includes('-dev') || process.argv.includes('--dev')
+      let devLogWin = null
+      if (isDevMode) {
+        devLogWin = new BrowserWindow({
+          width: 800,
+          height: 600,
+          title: 'DevCode Backend Logs',
+          backgroundColor: '#000000',
+          autoHideMenuBar: true
+        })
+        devLogWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<body style="background:#000;color:#0f0;font-family:Consolas,monospace;white-space:pre-wrap;font-size:12px;" id="b"></body>'))
+      }
+
+      function writeLog(prefix, data) {
+        const text = data.toString()
+        fs.appendFileSync(logPath, prefix + text)
+        if (devLogWin && !devLogWin.isDestroyed()) {
+          const safeText = JSON.stringify(prefix + text)
+          devLogWin.webContents.executeJavaScript(`document.getElementById('b').textContent += ${safeText}; window.scrollTo(0, document.body.scrollHeight);`).catch(()=>{})
+        }
+      }
+
+      serverProcess.stdout.on('data', data => writeLog('[STDOUT] ', data))
+      serverProcess.stderr.on('data', data => writeLog('[STDERR] ', data))
+      serverProcess.on('close', code => writeLog('[CLOSE] ', `Server exited with code ${code}\n`))
+      serverProcess.on('error', err => writeLog('[ERROR] ', err.message + '\n'))
     } catch (err) {
       fs.writeFileSync(path.join(app.getPath('userData'), 'server.log'), '[ERROR] ' + err.stack + '\n')
     }
