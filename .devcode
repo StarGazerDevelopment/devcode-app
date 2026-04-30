@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "forced": true,
   "downloadUrl": "https://github.com/StarGazerDevelopment/devcode-app/raw/main/Installer/installer.exe",
-  "releaseNotes": "### DevCode 1.1.1\n- Fixed AI Assistant issues with Groq and Gemini APIs\n- Improved internal API configurations"
+  "releaseNotes": "### DevCode 1.1.2\n- Automatically restarts DevCode after installing an update."
 }

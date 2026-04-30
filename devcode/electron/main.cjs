@@ -203,7 +203,7 @@ app.whenReady().then(async () => {
       }
       
       // Run the installer detached
-      const child = spawn(installerPath, ['/S', '/force'], {
+      const child = spawn(installerPath, ['/S', '--force-run'], {
         detached: true,
         stdio: 'ignore'
       })

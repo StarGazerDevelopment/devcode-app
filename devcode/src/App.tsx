@@ -354,7 +354,7 @@ function App() {
 
   async function checkUpdate() {
     try {
-      let CURRENT_VERSION = '1.1.1'
+      let CURRENT_VERSION = '1.1.2'
       if (window.devcode?.getVersion) {
         CURRENT_VERSION = await window.devcode.getVersion()
       }
@@ -1310,7 +1310,7 @@ function App() {
               }} 
             />
             <span style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--fg-secondary)', fontWeight: 500, opacity: 0.8 }}>
-              {updateAvailable ? `v1.1.0 (Update ${updateAvailable.version} Available)` : 'v1.1.0'}
+              {updateAvailable ? `v1.1.2 (Update ${updateAvailable.version} Available)` : 'v1.1.2'}
             </span>
           </div>
         </aside>
