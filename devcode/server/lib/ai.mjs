@@ -9,8 +9,26 @@ function requireEnv(name) {
 }
 
 export function createGroqClient() {
-  const apiKey = requireEnv('GROQ_API_KEY')
-  return new Groq({ apiKey })
+  const globalEnv = getGlobalEnv()
+  const provider = globalEnv.DEVCODE_PROVIDER || 'GROQ_API_KEY'
+  const apiKey = globalEnv[provider] || process.env[provider]
+
+  if (!apiKey) throw new Error(`Missing ${provider} in API settings`)
+
+  let baseURL = 'https://api.groq.com/openai/v1'
+  if (provider === 'OPENAI_API_KEY') baseURL = 'https://api.openai.com/v1'
+  if (provider === 'OPENROUTER_API_KEY') baseURL = 'https://openrouter.ai/api/v1'
+  if (provider === 'TOGETHER_API_KEY') baseURL = 'https://api.together.xyz/v1'
+  if (provider === 'DEEPSEEK_API_KEY') baseURL = 'https://api.deepseek.com'
+  if (provider === 'MISTRAL_API_KEY') baseURL = 'https://api.mistral.ai/v1'
+  if (provider === 'PERPLEXITY_API_KEY') baseURL = 'https://api.perplexity.ai'
+  if (provider === 'AZURE_OPENAI_API_KEY') baseURL = 'https://api.openai.com/v1' // Assuming custom config needed
+  if (provider === 'CUSTOM_ENDPOINT_KEY') baseURL = globalEnv.CUSTOM_ENDPOINT_URL || 'http://localhost:11434/v1'
+
+  // If Anthropic or Gemini, groq-sdk won't work natively unless it's via a proxy, but let's assume OpenAI compatible for now.
+  // The UI limits them, or we can use generic endpoints.
+
+  return new Groq({ apiKey, baseURL })
 }
 
 export function defaultModel() {

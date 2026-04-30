@@ -11,7 +11,8 @@
     "dev:server": "node server/index.mjs",
     "dev:electron": "wait-on tcp:5173 tcp:3030 && electron electron/main.cjs",
     "dev:desktop": "concurrently -k \"npm:dev:server\" \"npm:dev:web\" \"npm:dev:electron\"",
-    "build": "tsc -b && vite build",
+    "build:server": "esbuild server/index.mjs --bundle --platform=node --target=node18 --format=cjs --outfile=dist-server/index.cjs --external:fsevents --external:node-pty",
+    "build": "tsc -b && vite build && npm run build:server",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.mjs",
@@ -25,8 +26,8 @@
     },
     "files": [
       "dist/**/*",
+      "dist-server/**/*",
       "electron/**/*",
-      "server/**/*",
       ".devcode",
       "package.json"
     ],
@@ -80,6 +81,7 @@
     "concurrently": "^9.2.1",
     "electron": "^41.3.0",
     "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

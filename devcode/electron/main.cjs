@@ -155,6 +155,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('devcode:getVersion', () => {
     try {
+      // First try to read from the userData directory where updates might store it
+      const userDevcodeFile = path.join(app.getPath('userData'), '.devcode')
+      if (fs.existsSync(userDevcodeFile)) {
+        const content = JSON.parse(fs.readFileSync(userDevcodeFile, 'utf8'))
+        return content.version
+      }
+      
+      // Fallback to the bundled one
       const devcodeFile = isDev ? path.join(__dirname, '..', '.devcode') : path.join(process.resourcesPath, 'app.asar', '.devcode')
       const content = JSON.parse(fs.readFileSync(devcodeFile, 'utf8'))
       return content.version
@@ -163,7 +171,7 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle('devcode:downloadAndInstall', async (event, url) => {
+  ipcMain.handle('devcode:downloadAndInstall', async (event, url, version) => {
     const os = require('os')
     const tempDir = path.join(os.homedir(), '.devcode')
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
@@ -178,6 +186,12 @@ app.whenReady().then(async () => {
       const { finished } = require('stream/promises')
       
       await finished(Readable.fromWeb(response.body).pipe(fileStream))
+      
+      // Update the local version file to reflect the new version
+      if (version) {
+        const userDevcodeFile = path.join(app.getPath('userData'), '.devcode')
+        fs.writeFileSync(userDevcodeFile, JSON.stringify({ version }, null, 2))
+      }
       
       // Run the installer detached
       const child = spawn(installerPath, ['/S', '/force'], {
@@ -198,10 +212,22 @@ app.whenReady().then(async () => {
   await createWindow()
 
   if (!isDev) {
-    const serverPath = path.join(process.resourcesPath, 'app.asar', 'server', 'index.mjs')
-    import('file://' + serverPath).catch(err => {
+    const serverPath = path.join(process.resourcesPath, 'app.asar', 'dist-server', 'index.cjs')
+    try {
+      serverProcess = spawn(process.execPath, [serverPath], {
+        env: { ...process.env, NODE_ENV: 'production', ELECTRON_RUN_AS_NODE: '1' },
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+      const logPath = path.join(app.getPath('userData'), 'server.log')
+      fs.writeFileSync(logPath, 'Starting server at ' + serverPath + '\n')
+      
+      serverProcess.stdout.on('data', data => fs.appendFileSync(logPath, '[STDOUT] ' + data.toString()))
+      serverProcess.stderr.on('data', data => fs.appendFileSync(logPath, '[STDERR] ' + data.toString()))
+      serverProcess.on('close', code => fs.appendFileSync(logPath, '[CLOSE] Server exited with code ' + code + '\n'))
+      serverProcess.on('error', err => fs.appendFileSync(logPath, '[ERROR] ' + err.message + '\n'))
+    } catch (err) {
       fs.writeFileSync(path.join(app.getPath('userData'), 'server.log'), '[ERROR] ' + err.stack + '\n')
-    })
+    }
   }
 
   app.on('activate', async () => {

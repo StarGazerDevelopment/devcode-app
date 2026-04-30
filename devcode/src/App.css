@@ -886,3 +886,76 @@ html[data-theme='dark'] .tabBtnActive {
   border: 0;
   background: #fff;
 }
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary);
+  z-index: 99999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease-out;
+  /* Include titlebar dragging so you can move it while loading */
+  -webkit-app-region: drag;
+}
+
+.loading-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  -webkit-app-region: no-drag;
+}
+
+.loading-logo {
+  width: 120px;
+  height: auto;
+  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.loading-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.loading-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--fg-secondary);
+  height: 20px; /* reserve space */
+}
+
+.loading-bar-container {
+  width: 300px;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

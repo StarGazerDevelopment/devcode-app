@@ -6,8 +6,8 @@ productName: DevCode
 files:
   - filter:
       - dist/**/*
+      - dist-server/**/*
       - electron/**/*
-      - server/**/*
       - .devcode
       - package.json
 win:

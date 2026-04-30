@@ -31,6 +31,9 @@ function App() {
   const [tree, setTree] = useState<FsTree | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ '.': true })
   
+  const [loadingPhase, setLoadingPhase] = useState<number>(1)
+  const [loadingSubtitle, setLoadingSubtitle] = useState<string>('')
+  
   // Editor state
   const [openFiles, setOpenFiles] = useState<string[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -108,7 +111,7 @@ function App() {
     if (window.devcode?.downloadAndInstall) {
       setIsDownloading(true)
       try {
-        await window.devcode.downloadAndInstall(updateAvailable.url)
+        await window.devcode.downloadAndInstall(updateAvailable.url, updateAvailable.version)
       } catch (err: any) {
         console.error('Download failed:', err)
         alert(`Failed to download update: ${err.message}`)
@@ -287,45 +290,53 @@ function App() {
   const [isDownloading, setIsDownloading] = useState(false)
   
   async function initProject() {
-    const s = await apiGet<{ settings: { onboarded: boolean, theme: string }, env: Record<string, string> }>('/api/settings')
-    if (s.ok) {
-      if (!s.settings.onboarded) {
-        setShowOnboarding(true)
+    try {
+      const s = await apiGet<{ settings: { onboarded: boolean, theme: string }, env: Record<string, string> }>('/api/settings')
+      if (s.ok) {
+        if (!s.settings.onboarded) {
+          setShowOnboarding(true)
+        }
+        if (s.settings.theme) {
+          setTheme(s.settings.theme as 'light'|'dark')
+        }
+        setApiKeys(s.env || {})
+        if (s.env && s.env.DEVCODE_MODEL) {
+          setSelectedModel(s.env.DEVCODE_MODEL)
+        }
+        if (s.env && s.env.DEVCODE_PROVIDER) {
+          setSelectedProviderId(s.env.DEVCODE_PROVIDER)
+        }
       }
-      if (s.settings.theme) {
-        setTheme(s.settings.theme as 'light'|'dark')
-      }
-      setApiKeys(s.env || {})
-      if (s.env && s.env.DEVCODE_MODEL) {
-        setSelectedModel(s.env.DEVCODE_MODEL)
-      }
-    }
 
-    const pr = await apiGet<{ projects: string[] }>('/api/projects')
-    if (pr.ok) {
-      setGlobalProjects(pr.projects)
-    }
-
-    const state = (await window.devcode?.getState?.()) ?? {}
-    const last = typeof state.lastProjectPath === 'string' ? state.lastProjectPath : null
-    if (!last) return
-    
-    for (let i = 0; i < 10; i++) {
-      const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: last })
-      if (r.ok) {
-        setProjectRoot(r.projectRoot)
-        await apiPost('/api/projects', { projectRoot: r.projectRoot }) // Add to global if not exists
-        
-        // Refresh global projects list
-        const pr2 = await apiGet<{ projects: string[] }>('/api/projects')
-        if (pr2.ok) setGlobalProjects(pr2.projects)
-
-        await refreshTree()
-        await loadChat('default')
-        return
+      const pr = await apiGet<{ projects: string[] }>('/api/projects')
+      if (pr.ok) {
+        setGlobalProjects(pr.projects)
       }
-      await new Promise(res => setTimeout(res, 500))
+
+      const state = (await window.devcode?.getState?.()) ?? {}
+      const last = typeof state.lastProjectPath === 'string' ? state.lastProjectPath : null
+      if (!last || last === '.' || last.endsWith('.devcode')) return false
+      
+      for (let i = 0; i < 10; i++) {
+        const r = await apiPost<{ projectRoot: string }>('/api/project/open', { path: last })
+        if (r.ok) {
+          setProjectRoot(r.projectRoot)
+          await apiPost('/api/projects', { projectRoot: r.projectRoot }) // Add to global if not exists
+          
+          // Refresh global projects list
+          const pr2 = await apiGet<{ projects: string[] }>('/api/projects')
+          if (pr2.ok) setGlobalProjects(pr2.projects)
+
+          await refreshTree()
+          await loadChat('default')
+          return true
+        }
+        await new Promise(res => setTimeout(res, 500))
+      }
+    } catch (e) {
+      console.warn("initProject failed:", e)
     }
+    return false
   }
 
   function compareSemver(a: string, b: string) {
@@ -347,11 +358,11 @@ function App() {
 
       // Cache buster to ensure it checks the actual raw GitHub file and not a cached version
       const res = await fetch('https://raw.githubusercontent.com/StarGazerDevelopment/devcode-app/main/.devcode?t=' + Date.now())
-      if (!res.ok) return
+      if (!res.ok) return null
       const config = await res.json()
 
       const isNewer = compareSemver(config.version, CURRENT_VERSION) > 0
-      if (!isNewer) return
+      if (!isNewer) return config.version
 
       // It's a new version. Check remind settings.
       const remRes = await apiGet<{ data: { date: number, skippedVersion: string } | null }>('/api/update/remind')
@@ -385,15 +396,49 @@ function App() {
         })
         setShowUpdateModal(true)
       }
+      
+      return config.version
 
     } catch (err) {
       console.error('Update check failed:', err)
+      return null
     }
   }
 
   useEffect(() => {
-    void initProject()
-    void checkUpdate()
+    async function startApp() {
+      // Phase 1: Initialising
+      setLoadingPhase(1)
+      setLoadingSubtitle('Starting backend services...')
+      await new Promise(r => setTimeout(r, 800)) // brief delay for visual effect
+
+      // Phase 2: Loading Project
+      setLoadingPhase(2)
+      setLoadingSubtitle('Reading workspace settings...')
+      await initProject()
+      await new Promise(r => setTimeout(r, 600)) // brief delay
+
+      // Phase 3: Checking Updates
+      setLoadingPhase(3)
+      setLoadingSubtitle('Connecting to GitHub...')
+      const v = await checkUpdate()
+      if (v) {
+        setLoadingSubtitle(`Latest version: ${v}`)
+      } else {
+        setLoadingSubtitle('Up to date.')
+      }
+      await new Promise(r => setTimeout(r, 800)) // brief delay
+
+      // Phase 4: Done
+      setLoadingPhase(4)
+      setLoadingSubtitle('Done!')
+      await new Promise(r => setTimeout(r, 400))
+      
+      // Finish
+      setLoadingPhase(0)
+    }
+    
+    void startApp()
   }, [])
 
   useEffect(() => {
@@ -573,7 +618,7 @@ function App() {
   }
 
   async function completeOnboarding() {
-    const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel }
+    const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel, DEVCODE_PROVIDER: selectedProviderId }
     await apiPost('/api/settings', { settings: { onboarded: true, theme }, env: finalEnv })
     setShowOnboarding(false)
   }
@@ -902,7 +947,7 @@ function App() {
 
             <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
               <button className="primaryBtn" onClick={() => {
-                const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel }
+                const finalEnv = { ...apiKeys, DEVCODE_MODEL: selectedModel, DEVCODE_PROVIDER: selectedProviderId }
                 apiPost('/api/settings', { settings: { theme, onboarded: true }, env: finalEnv })
                 setShowSettings(false)
               }}>
@@ -1199,6 +1244,28 @@ function App() {
       )}
         </div>
       </div>
+      {/* Loading Screen */}
+      {loadingPhase > 0 && (
+        <div className={`loading-overlay ${loadingPhase === 4 ? 'fade-out' : ''}`}>
+          <div className="loading-content">
+            <img src={logo} alt="devcode logo" className="loading-logo" />
+            <h2 className="loading-title">
+              {loadingPhase === 1 && 'Initialising DevCode...'}
+              {loadingPhase === 2 && 'Loading Project And Settings...'}
+              {loadingPhase === 3 && 'Checking for new updates...'}
+              {loadingPhase === 4 && 'Done'}
+            </h2>
+            <p className="loading-subtitle">{loadingSubtitle}</p>
+            <div className="loading-bar-container">
+              <div 
+                className="loading-bar-fill" 
+                style={{ width: `${(loadingPhase / 4) * 100}%` }} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

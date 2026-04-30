@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('devcode', {
   getState: () => ipcRenderer.invoke('devcode:getState'),
   setState: (patch) => ipcRenderer.invoke('devcode:setState', patch),
   getVersion: () => ipcRenderer.invoke('devcode:getVersion'),
-  downloadAndInstall: (url) => ipcRenderer.invoke('devcode:downloadAndInstall', url),
+  downloadAndInstall: (url, version) => ipcRenderer.invoke('devcode:downloadAndInstall', url, version),
   
   // Folder Fetch Logic (IPC)
   fsTree: (root, dir) => ipcRenderer.invoke('fs:tree', root, dir),
