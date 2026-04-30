@@ -2,5 +2,5 @@
   "version": "1.1.0",
   "forced": true,
   "downloadUrl": "https://github.com/StarGazerDevelopment/devcode-app/raw/main/Installer/installer.exe",
-  "releaseNotes": "### DevCode 1.0.8\n- Added terminal tabs, adaptive UI, dynamic model fetching, and custom title bar."
+  "releaseNotes": "### DevCode 1.1.0\n- Added Right-Click Context Menu to remove projects from history\n- Auto-refresh terminal instances and files when switching projects\n- Fixed update modal display bugs"
 }
