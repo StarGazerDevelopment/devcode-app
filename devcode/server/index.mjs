@@ -192,21 +192,32 @@ app.get('/api/fs/watch', (req, res) => {
       res.write(`data: ${JSON.stringify(data)}\n\n`)
     }
 
-    const watcher = chokidar.watch(root, {
-      ignored: /(^|[\/\\])\../, // ignore dotfiles like .git
-      persistent: true,
-      ignoreInitial: true
-    })
+    let watcher = null
+    try {
+      watcher = chokidar.watch(root, {
+        ignored: /(^|[\/\\])\../, // ignore dotfiles like .git
+        persistent: true,
+        ignoreInitial: true,
+        ignorePermissionErrors: true // VERY IMPORTANT for Windows protected folders
+      })
 
-    const onEvent = (event, p) => {
-      const rel = path.relative(root, p).replace(/\\/g, '/')
-      send('change', { event, path: rel })
+      const onEvent = (event, p) => {
+        const rel = path.relative(root, p).replace(/\\/g, '/')
+        send('change', { event, path: rel })
+      }
+
+      watcher.on('all', onEvent)
+      watcher.on('error', (error) => {
+        // Silently handle EPERM errors on protected folders to prevent crashing the server
+        console.error('Watcher error (ignored):', error)
+      })
+
+    } catch (err) {
+      console.error('Failed to initialize watcher:', err)
     }
 
-    watcher.on('all', onEvent)
-
     req.on('close', () => {
-      watcher.close()
+      if (watcher) watcher.close()
     })
   } catch (e) {
     res.status(500).end()

@@ -32227,19 +32227,29 @@ app.get("/api/fs/watch", (req, res) => {
 
 `);
     };
-    const watcher = chokidar_default.watch(root, {
-      ignored: /(^|[\/\\])\../,
-      // ignore dotfiles like .git
-      persistent: true,
-      ignoreInitial: true
-    });
-    const onEvent = (event, p) => {
-      const rel = import_node_path7.default.relative(root, p).replace(/\\/g, "/");
-      send("change", { event, path: rel });
-    };
-    watcher.on("all", onEvent);
+    let watcher = null;
+    try {
+      watcher = chokidar_default.watch(root, {
+        ignored: /(^|[\/\\])\../,
+        // ignore dotfiles like .git
+        persistent: true,
+        ignoreInitial: true,
+        ignorePermissionErrors: true
+        // VERY IMPORTANT for Windows protected folders
+      });
+      const onEvent = (event, p) => {
+        const rel = import_node_path7.default.relative(root, p).replace(/\\/g, "/");
+        send("change", { event, path: rel });
+      };
+      watcher.on("all", onEvent);
+      watcher.on("error", (error) => {
+        console.error("Watcher error (ignored):", error);
+      });
+    } catch (err) {
+      console.error("Failed to initialize watcher:", err);
+    }
     req.on("close", () => {
-      watcher.close();
+      if (watcher) watcher.close();
     });
   } catch (e) {
     res.status(500).end();

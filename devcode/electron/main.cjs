@@ -66,16 +66,25 @@ function setupWatcher(root, webContents) {
   if (activeWatcher) {
     activeWatcher.close()
   }
-  activeWatcher = chokidar.watch(root, {
-    ignored: /(^|[\/\\])\../,
-    persistent: true,
-    ignoreInitial: true
-  })
-  
-  activeWatcher.on('all', (event, p) => {
-    const rel = path.relative(root, p).replace(/\\/g, '/')
-    webContents.send('fs:watch:change', { event, path: rel })
-  })
+  try {
+    activeWatcher = chokidar.watch(root, {
+      ignored: /(^|[\/\\])\../,
+      persistent: true,
+      ignoreInitial: true,
+      ignorePermissionErrors: true
+    })
+    
+    activeWatcher.on('all', (event, p) => {
+      const rel = path.relative(root, p).replace(/\\/g, '/')
+      webContents.send('fs:watch:change', { event, path: rel })
+    })
+
+    activeWatcher.on('error', (error) => {
+      console.error('Watcher error (ignored):', error)
+    })
+  } catch (err) {
+    console.error('Failed to setup watcher:', err)
+  }
 }
 
 ipcMain.handle('fs:tree', async (e, root, dir) => {
