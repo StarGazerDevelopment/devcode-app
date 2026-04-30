@@ -202,12 +202,29 @@ app.whenReady().then(async () => {
         fs.writeFileSync(userDevcodeFile, JSON.stringify({ version }, null, 2))
       }
       
-      // Run the installer detached
-      const child = spawn(installerPath, ['/S', '--force-run'], {
+      // Run the installer detached without /S to show the window
+      const child = spawn(installerPath, ['--force-run'], {
         detached: true,
         stdio: 'ignore'
       })
       child.unref()
+
+      // Wait until the installer process is actually running before quitting
+      const { exec } = require('child_process')
+      const util = require('util')
+      const execAsync = util.promisify(exec)
+
+      for (let i = 0; i < 20; i++) {
+        try {
+          const { stdout } = await execAsync('tasklist | findstr /i devcode_update')
+          if (stdout && stdout.toLowerCase().includes('devcode_update')) {
+            break
+          }
+        } catch (e) {
+          // findstr returns non-zero if no match
+        }
+        await new Promise(r => setTimeout(r, 500))
+      }
 
       // Quit app to allow installation
       app.quit()
